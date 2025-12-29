@@ -1,19 +1,21 @@
 Package: scPAS
 Type: Package
 Title: Single-Cell Phenotype-Associated Subpopulation Identifier
-Version: 0.2.1
+Version: 1.0.0
 Authors@R: c(
-    person("Aimin", "Xie", email = "aiminyy1993@gmail.com", role = c("aut", "cre")),
-    person("Zaoqu", "Liu", email = "liuzaoqu@163.com", role = "ctb", comment = "Seurat v4 compatibility")
+    person("Aimin", "Xie", email = "aiminyy1993@gmail.com", role = "aut", comment = "Original author"),
+    person("Zaoqu", "Liu", email = "liuzaoqu@163.com", role = c("aut", "cre"), 
+           comment = c(ORCID = "0000-0002-0452-742X", "Maintainer, bug fixes and optimization"))
     )
-Maintainer: Aimin Xie <aiminyy1993@gmail.com>
+Maintainer: Zaoqu Liu <liuzaoqu@163.com>
 Description: Identifies phenotype-associated cell subpopulations from single-cell RNA-seq 
     data by integrating bulk RNA-seq data with phenotype information. This package uses 
     network-regularized sparse regression to quantify the strength of association between 
     each cell and a phenotype (e.g., disease stage, tumor metastasis, treatment response, 
     survival outcomes). Compatible with Seurat v4 (4.0.0-4.4.0) and SeuratObject v4 
     (4.0.0-4.1.4). The method supports Gaussian (continuous), binomial (binary), and 
-    Cox (survival) regression families.
+    Cox (survival) regression families. Version 1.0.0 includes critical bug fixes for 
+    sparse matrix operations, improved robustness, and parallel computing support.
 URL: https://github.com/Zaoqu-Liu/scPAS
 BugReports: https://github.com/Zaoqu-Liu/scPAS/issues
 Depends: R (>= 4.0.5)
@@ -33,4 +35,4 @@ LinkingTo: Rcpp, RcppEigen
 License: GPL (>= 2)
 Encoding: UTF-8
 LazyData: true
-RoxygenNote: 7.3.1
+RoxygenNote: 7.3.3

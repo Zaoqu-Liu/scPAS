@@ -123,14 +123,26 @@ scPAS <- function(bulk_dataset, sc_dataset, phenotype,assay = 'RNA', tag = NULL,
     cor.m <- stats::cor(x)
   }else{
     message("Step 3: Constructing a gene-gene similarity by single cell data....")
-    cor.m <- sparse.cor(t(Expression_cell))
+    # Fix: Ensure Expression_cell is converted to sparse matrix before transpose
+    if (!methods::is(Expression_cell, "sparseMatrix")) {
+      Expression_cell <- methods::as(Expression_cell, "sparseMatrix")
+    }
+    Expression_cell_t <- Matrix::t(Expression_cell)  # Use Matrix::t for sparse matrices
+    cor.m <- sparse.cor(Expression_cell_t)
   }
-  cor.m[which(cor.m < 0)] <- 0
+  # Fix: Use direct logical indexing
+  cor.m[cor.m < 0] <- 0
+  # Fix: Add rownames/colnames for FindNeighbors (should be gene names)
+  if (is.null(rownames(cor.m))) {
+    rownames(cor.m) <- colnames(cor.m) <- rownames(Expression_cell)
+  }
   SNN <- Seurat::FindNeighbors(1 - cor.m, distance.matrix = TRUE)
   Network <- as.matrix(SNN$snn)
   diag(Network) <- 0
-  Network[which(Network > 0.2)] <- 1
-  Network[which(Network <= 0.2)] <- 0
+  # Fix: Replace NA with 0 and ensure numeric before threshold
+  Network[is.na(Network)] <- 0
+  Network[Network > 0.2] <- 1
+  Network[Network <= 0.2] <- 0
 
   message("Step 4: Optimizing the network-regularized sparse regression model....")
   if (family == "binomial"){
@@ -185,7 +197,8 @@ scPAS <- function(bulk_dataset, sc_dataset, phenotype,assay = 'RNA', tag = NULL,
   scaled_exp <- sparse_row_scale(Expression_cell, center = TRUE, scale = TRUE)
   colnames(scaled_exp) <- colnames(Expression_cell)
   rownames(scaled_exp) <- rownames(Expression_cell)
-  scaled_exp[which(is.na(scaled_exp))] <- 0
+  # Fix: Use direct logical indexing for NA replacement
+  scaled_exp[is.na(scaled_exp)] <- 0
   
   # Parallel permutation test for better performance
   if (n_cores > 1) {
@@ -206,8 +219,14 @@ scPAS <- function(bulk_dataset, sc_dataset, phenotype,assay = 'RNA', tag = NULL,
   
   risk_score <- perm_results$risk_score
   risk_score.background <- perm_results$risk_score.background
+  
+  # Fix: Ensure risk_score.background is a matrix
+  if (!is.matrix(risk_score.background)) {
+    risk_score.background <- as.matrix(risk_score.background)
+  }
+  
   if(independent){
-    mean.background <- rowMeans(risk_score.background)
+    mean.background <- Matrix::rowMeans(risk_score.background)
     sd.background <- apply(risk_score.background, 1, stats::sd)
   }else{
     mean.background <- mean(as.matrix(risk_score.background))
@@ -438,8 +457,11 @@ sparse.cor <- function(x){
   m <- ncol(x)
   ii <- unique(x@i) + 1 # rows with a non-zero element
 
-  Ex <- colMeans(x)
-  nozero <- as.vector(x[ii, ]) - rep(Ex, each = length(ii))
+  # Fix: Use Matrix::colMeans for sparse matrices
+  Ex <- Matrix::colMeans(x)
+  
+  # Fix: Convert to vector properly
+  nozero <- as.vector(as.matrix(x[ii, , drop = FALSE])) - rep(Ex, each = length(ii))
 
   covmat <- (crossprod(matrix(nozero, ncol = m)) +
               Matrix::tcrossprod(Ex) * (n - length(ii))
@@ -497,7 +519,8 @@ scPAS.prediction <- function(model, test.data, assay = 'RNA', FDR.threshold = 0.
   scaled_exp <- sparse_row_scale(Expression_cell, center = TRUE, scale = TRUE)
   colnames(scaled_exp) <- colnames(Expression_cell)
   rownames(scaled_exp) <- rownames(Expression_cell)
-  scaled_exp[which(is.na(scaled_exp))] <- 0
+  # Fix: Use direct logical indexing for NA replacement
+  scaled_exp[is.na(scaled_exp)] <- 0
   risk_score <- crossprod(scaled_exp, Coefs)
 
   set.seed(12345)
@@ -508,9 +531,14 @@ scPAS.prediction <- function(model, test.data, assay = 'RNA', FDR.threshold = 0.
   })
   randomPermutation <- methods::as(randomPermutation, "sparseMatrix")
   risk_score.background <- crossprod(scaled_exp, randomPermutation)
+  
+  # Fix: Ensure risk_score.background is a matrix
+  if (!is.matrix(risk_score.background)) {
+    risk_score.background <- as.matrix(risk_score.background)
+  }
 
   if(independent){
-    mean.background <- rowMeans(risk_score.background)
+    mean.background <- Matrix::rowMeans(risk_score.background)
     sd.background <- apply(risk_score.background, 1, stats::sd)
   }else{
     mean.background <- mean(as.matrix(risk_score.background))
