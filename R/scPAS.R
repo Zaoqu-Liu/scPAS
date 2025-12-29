@@ -37,51 +37,51 @@ scPAS <- function(bulk_dataset, sc_dataset, phenotype,assay = 'RNA', tag = NULL,
                     alpha = NULL,network_class=c('SC','bulk'),independent=T, family = c("gaussian","binomial","cox"),permutation_times=2000,
                     FDR.threshold = 0.05){
   # Packages loaded via Imports in DESCRIPTION
-  network_class=match.arg(network_class)
-  family=match.arg(family)
-  imputation_method =match.arg(imputation_method)
-  DefaultAssay(sc_dataset) <- assay
+  network_class <- match.arg(network_class)
+  family <- match.arg(family)
+  imputation_method <- match.arg(imputation_method)
+  Seurat::DefaultAssay(sc_dataset) <- assay
 
-  if(any(class(sc_dataset)=='Seurat')){
+  if(inherits(sc_dataset, 'Seurat')){
 
     if(is.null(nfeature)){
-      common <- intersect(rownames(bulk_dataset),rownames(sc_dataset))
+      common <- intersect(rownames(bulk_dataset), rownames(sc_dataset))
     }
     else if(is.numeric(nfeature) & length(nfeature)==1){
-      sc_dataset <- FindVariableFeatures(sc_dataset, selection.method = "vst", verbose = F,nfeatures = nfeature)
+      sc_dataset <- Seurat::FindVariableFeatures(sc_dataset, selection.method = "vst", verbose = FALSE, nfeatures = nfeature)
 
-      common <- intersect(rownames(bulk_dataset),VariableFeatures(sc_dataset))
+      common <- intersect(rownames(bulk_dataset), Seurat::VariableFeatures(sc_dataset))
       common <- common[!grepl(pattern ='^RP[LS]',common)]
       common <- common[!grepl(pattern ='^MT-',common)]
     }else if(is.character(nfeature) & length(nfeature)>1){
-      common <- intersect(rownames(bulk_dataset),rownames(sc_dataset))
-      common <- intersect(common,nfeature)
-      common <- common[!grepl(pattern ='^RP[LS]',common)]
-      common <- common[!grepl(pattern ='^MT-',common)]
+      common <- intersect(rownames(bulk_dataset), rownames(sc_dataset))
+      common <- intersect(common, nfeature)
+      common <- common[!grepl(pattern = '^RP[LS]', common)]
+      common <- common[!grepl(pattern = '^MT-', common)]
     }
   }else{
-    print("Step 0:The single-cell data is not a Seurat object, and a default Seurat pipeline will be run.")
+    message("Step 0: The single-cell data is not a Seurat object, and a default Seurat pipeline will be run.")
     sc_dataset <- run_Seurat(sc_dataset)
     if(is.null(nfeature)){
-      common <- intersect(rownames(bulk_dataset),rownames(sc_dataset))
-      common <- common[!grepl(pattern ='^RP[LS]',common)]
-      common <- common[!grepl(pattern ='^MT-',common)]
+      common <- intersect(rownames(bulk_dataset), rownames(sc_dataset))
+      common <- common[!grepl(pattern = '^RP[LS]', common)]
+      common <- common[!grepl(pattern = '^MT-', common)]
     }
     else if(is.numeric(nfeature)){
-      sc_dataset <- FindVariableFeatures(sc_dataset, selection.method = "vst", verbose = F,nfeatures = nfeature)
-      common <- intersect(rownames(bulk_dataset),VariableFeatures(sc_dataset))
+      sc_dataset <- Seurat::FindVariableFeatures(sc_dataset, selection.method = "vst", verbose = FALSE, nfeatures = nfeature)
+      common <- intersect(rownames(bulk_dataset), Seurat::VariableFeatures(sc_dataset))
     }else if(is.character(nfeature) & length(nfeature)>1){
-      common <- intersect(rownames(bulk_dataset),rownames(sc_dataset))
-      common <- intersect(common,nfeature)
-      common <- common[!grepl(pattern ='^RP[LS]',common)]
-      common <- common[!grepl(pattern ='^MT-',common)]
+      common <- intersect(rownames(bulk_dataset), rownames(sc_dataset))
+      common <- intersect(common, nfeature)
+      common <- common[!grepl(pattern = '^RP[LS]', common)]
+      common <- common[!grepl(pattern = '^MT-', common)]
     }
   }
   if (length(common) == 0) {
-    stop("There is no common genes between the given single-cell and bulk samples.")
+    stop("There are no common genes between the given single-cell and bulk samples.")
   }
 
-  print("Step 1:Quantile normalization of bulk data.")
+  message("Step 1: Quantile normalization of bulk data.")
   Expression_bulk <- preprocessCore::normalize.quantiles(as.matrix(bulk_dataset))
   rownames(Expression_bulk) <- rownames(bulk_dataset)
   colnames(Expression_bulk) <- colnames(bulk_dataset)
@@ -89,12 +89,12 @@ scPAS <- function(bulk_dataset, sc_dataset, phenotype,assay = 'RNA', tag = NULL,
 
 
   if(imputation){
-    sc_dataset <- imputation(sc_dataset,assay = assay,method = imputation_method)
-    assay <- DefaultAssay(sc_dataset)
+    sc_dataset <- imputation(sc_dataset, assay = assay, method = imputation_method)
+    assay <- Seurat::DefaultAssay(sc_dataset)
   }
 
-  print("Step 2: Extracting single-cell expression profiles....")
-  sc_exprs <- GetAssayData(object = sc_dataset, assay = assay,slot = 'data')
+  message("Step 2: Extracting single-cell expression profiles....")
+  sc_exprs <- Seurat::GetAssayData(object = sc_dataset, assay = assay, slot = 'data')
   #Expression_cell <- as(preprocessCore::normalize.quantiles(as.matrix(sc_exprs)), "dgCMatrix")
   Expression_cell <- sc_exprs
   rownames(Expression_cell) <- rownames(sc_exprs)
@@ -107,39 +107,37 @@ scPAS <- function(bulk_dataset, sc_dataset, phenotype,assay = 'RNA', tag = NULL,
 
 
   # Construct a gene network
-  if(network_class=='bulk'){
-    print("Step 3: Constructing a gene-gene similarity by bulk data....")
-    cor.m <- cor(x)
-
+  if(network_class == 'bulk'){
+    message("Step 3: Constructing a gene-gene similarity by bulk data....")
+    cor.m <- stats::cor(x)
   }else{
-    print("Step 3: Constructing a gene-gene similarity by single cell data....")
+    message("Step 3: Constructing a gene-gene similarity by single cell data....")
     cor.m <- sparse.cor(t(Expression_cell))
   }
-  cor.m[which(cor.m<0)] <- 0
-  SNN <- FindNeighbors(1-cor.m,distance.matrix=T)
+  cor.m[which(cor.m < 0)] <- 0
+  SNN <- Seurat::FindNeighbors(1 - cor.m, distance.matrix = TRUE)
   Network <- as.matrix(SNN$snn)
   diag(Network) <- 0
-  Network[which(Network >0.2)] <- 1
+  Network[which(Network > 0.2)] <- 1
   Network[which(Network <= 0.2)] <- 0
 
-  print("Step 4: Optimizing the network-regularized sparse regression model....")
+  message("Step 4: Optimizing the network-regularized sparse regression model....")
   if (family == "binomial"){
     y <- as.numeric(phenotype)
     z <- table(y)
-    print(sprintf("Current phenotype contains %d %s and %d %s samples.", z[1], tag[1], z[2], tag[2]))
-    print("Perform logistic regression on the given phenotypes:")
-
+    message(sprintf("Current phenotype contains %d %s and %d %s samples.", z[1], tag[1], z[2], tag[2]))
+    message("Performing logistic regression on the given phenotypes...")
   }
   if (family == "gaussian"){
     y <- as.numeric(phenotype)
-    print("Perform linear regression on the given phenotypes:")
+    message("Performing linear regression on the given phenotypes...")
   }
   if (family == "cox"){
     y <- as.matrix(phenotype)
     if (ncol(y) != 2){
       stop("The size of survival data is wrong. Please check inputs and selected regression type.")
     }else{
-      print("Perform cox regression on the given clinical outcomes:")
+      message("Performing cox regression on the given clinical outcomes...")
     }
   }
 
@@ -150,9 +148,9 @@ scPAS <- function(bulk_dataset, sc_dataset, phenotype,assay = 'RNA', tag = NULL,
   lambda <- c()
   for (i in 1:length(alpha)){
     set.seed(123)
-    fit0 <- APML0(x = x,y = y,family = family,penalty = 'Net',Omega = Network,alpha = alpha[i],nlambda = 100,nfolds = min(10,nrow(x)))
-    fit1 <- APML0(x = x,y = y,family = family,penalty = 'Net',Omega = Network,alpha = alpha[i],lambda = fit0$lambda.min)
-    lambda <- c(lambda,fit0$lambda.min)
+    fit0 <- APML0(x = x, y = y, family = family, penalty = 'Net', Omega = Network, alpha = alpha[i], nlambda = 100, nfolds = min(10, nrow(x)))
+    fit1 <- APML0(x = x, y = y, family = family, penalty = 'Net', Omega = Network, alpha = alpha[i], lambda = fit0$lambda.min)
+    lambda <- c(lambda, fit0$lambda.min)
     if (family == "binomial"){
       Coefs <- as.numeric(fit1$Beta[2:(ncol(x)+1)])
     }else{
@@ -161,16 +159,15 @@ scPAS <- function(bulk_dataset, sc_dataset, phenotype,assay = 'RNA', tag = NULL,
     Feature1 <- colnames(x)[which(Coefs > 0)]
     Feature2 <- colnames(x)[which(Coefs < 0)]
     percentage <- (length(Feature1) + length(Feature2)) / ncol(x)
-    print(sprintf("alpha = %s", alpha[i]))
-    print(sprintf("lambda = %s", fit0$lambda.min))
-    print(sprintf("scPAS identified %d rick+ features and %d rick- features.", length(Feature1), length(Feature2)))
-    print(sprintf("The percentage of selected feature is: %s%%", formatC(percentage*100, format = 'f', digits = 3)))
-
+    message(sprintf("alpha = %s", alpha[i]))
+    message(sprintf("lambda = %s", fit0$lambda.min))
+    message(sprintf("scPAS identified %d risk+ features and %d risk- features.", length(Feature1), length(Feature2)))
+    message(sprintf("The percentage of selected features is: %s%%", formatC(percentage*100, format = 'f', digits = 3)))
     cat("\n")
   }
-  print("|**************************************************|")
+  message("|**************************************************|")
 
-  print("Step 5: calculating quantified risk scores....")
+  message("Step 5: Calculating quantified risk scores....")
   names(Coefs) <- colnames(x)
   # Use base R scaling instead of Seurat internal function for compatibility
   scaled_exp <- t(scale(t(as.matrix(Expression_cell)), center = TRUE, scale = TRUE))
@@ -180,55 +177,59 @@ scPAS <- function(bulk_dataset, sc_dataset, phenotype,assay = 'RNA', tag = NULL,
   rownames(scaled_exp) <- rownames(Expression_cell)
   scaled_exp[which(is.na(scaled_exp))] <- 0
   scaled_exp <- as(scaled_exp, "sparseMatrix")
-  risk_score <- crossprod(scaled_exp,Coefs)
+  risk_score <- crossprod(scaled_exp, Coefs)
 
-  print(paste0("Step 6: qualitative identification by permutation test program with ", as.character(permutation_times), " times random perturbations"))
+  message(paste0("Step 6: Qualitative identification by permutation test program with ", as.character(permutation_times), " random perturbations"))
 
   set.seed(12345)
 
-  randomPermutation <- sapply(1:permutation_times,FUN = function(x){
-    set.seed(1234+x)
-    sample(Coefs,length(Coefs),replace = F)
+  randomPermutation <- sapply(1:permutation_times, FUN = function(x){
+    set.seed(1234 + x)
+    sample(Coefs, length(Coefs), replace = FALSE)
   })
-  randomPermutation <- as(randomPermutation, "sparseMatrix")
-  risk_score.background <- crossprod(scaled_exp,randomPermutation)
+  randomPermutation <- methods::as(randomPermutation, "sparseMatrix")
+  risk_score.background <- crossprod(scaled_exp, randomPermutation)
   if(independent){
     mean.background <- rowMeans(risk_score.background)
-    sd.background <- apply(risk_score.background,1,sd)
+    sd.background <- apply(risk_score.background, 1, stats::sd)
   }else{
     mean.background <- mean(as.matrix(risk_score.background))
-    sd.background <- sd(as.matrix(risk_score.background))
+    sd.background <- stats::sd(as.matrix(risk_score.background))
   }
 
+  Z <- (risk_score[,1] - mean.background) / sd.background
 
-
-  Z <- (risk_score[,1]-mean.background)/sd.background
-
-  p.value <- pnorm(q = abs(Z),mean = 0,sd = 1,lower.tail = F)
-  q.value <- p.adjust(p = p.value,method = 'BH')
-  risk_score_data.frame <- data.frame(cell=colnames(Expression_cell),
-                                      raw_score=risk_score[,1],
-                                      Z.statistics=Z,
-                                      p.value=p.value,
-                                      FDR=q.value
+  p.value <- stats::pnorm(q = abs(Z), mean = 0, sd = 1, lower.tail = FALSE)
+  q.value <- stats::p.adjust(p = p.value, method = 'BH')
+  risk_score_data.frame <- data.frame(
+    cell = colnames(Expression_cell),
+    raw_score = risk_score[,1],
+    Z.statistics = Z,
+    p.value = p.value,
+    FDR = q.value,
+    stringsAsFactors = FALSE
   )
 
+  risk_score_data.frame$cell_label <- ifelse(Z > 0 & q.value <= FDR.threshold, 'scPAS+', 
+                                              ifelse(Z < 0 & q.value <= FDR.threshold, 'scPAS-', '0'))
 
+  sc_dataset@misc$scPAS_para <- list(
+    alpha = alpha[1:i], 
+    lambda = lambda, 
+    family = family,
+    Coefs = Coefs,
+    bulk = x,
+    phenotype = y,
+    Network = Network
+  )
 
-  risk_score_data.frame$cell_lable <- ifelse(Z>0 & q.value<=FDR.threshold,'scPAS+',ifelse(Z<0 & q.value<=FDR.threshold,'scPAS-','0'))
+  sc_dataset <- Seurat::AddMetaData(sc_dataset, metadata = risk_score_data.frame$raw_score, col.name = "scPAS_RS")
+  sc_dataset <- Seurat::AddMetaData(sc_dataset, metadata = risk_score_data.frame$Z.statistics, col.name = "scPAS_NRS")
+  sc_dataset <- Seurat::AddMetaData(sc_dataset, metadata = risk_score_data.frame$p.value, col.name = "scPAS_Pvalue")
+  sc_dataset <- Seurat::AddMetaData(sc_dataset, metadata = risk_score_data.frame$FDR, col.name = "scPAS_FDR")
+  sc_dataset <- Seurat::AddMetaData(sc_dataset, metadata = risk_score_data.frame$cell_label, col.name = "scPAS")
 
-  sc_dataset@misc$scPAS_para <- list(alpha = alpha[1:i], lambda = lambda, family = family,Coefs=Coefs,bulk=x,phenotype=y,Network=Network)
-
-  sc_dataset <- AddMetaData(sc_dataset, metadata = risk_score_data.frame$raw_score, col.name = "scPAS_RS")
-
-  sc_dataset <- AddMetaData(sc_dataset, metadata = risk_score_data.frame$Z.statistics, col.name = "scPAS_NRS")
-
-  sc_dataset <- AddMetaData(sc_dataset, metadata = risk_score_data.frame$p.value, col.name = "scPAS_Pvalue")
-  sc_dataset <- AddMetaData(sc_dataset, metadata = risk_score_data.frame$FDR, col.name = "scPAS_FDR")
-  sc_dataset <- AddMetaData(sc_dataset, metadata = risk_score_data.frame$cell_lable, col.name = "scPAS")
-
-
-  print("Finished.")
+  message("Finished.")
   return(sc_dataset)
 
 }
@@ -289,21 +290,21 @@ run_Seurat <- function(counts, project = "Single_Cell", min.cells = 400, min.fea
                        dims_Neighbors = 1:10, dims_TSNE = 1:10, dims_UMAP = 1:10,
                        verbose = TRUE){
   # Seurat functions available via Imports
-  if('matrix'  %in% class(counts) | 'dgCMatrix' %in% class(counts)){
-    data <- CreateSeuratObject(counts = counts, project = project, min.cells = min.cells, min.features = min.features,meta.data =meta.data)
-  }else if('Seurat' %in% class(counts)){
+  if(inherits(counts, c('matrix', 'dgCMatrix'))){
+    data <- Seurat::CreateSeuratObject(counts = counts, project = project, min.cells = min.cells, min.features = min.features, meta.data = meta.data)
+  }else if(inherits(counts, 'Seurat')){
     data <- counts
   }else{
     stop("The class of scRNA-seq data is wrong. Please input a count matrix or Seurat object")
   }
-  data <- NormalizeData(object = data, normalization.method = normalization.method, scale.factor = scale.factor, verbose = verbose)
-  data <- FindVariableFeatures(object = data, selection.method = selection.method, verbose = verbose)
-  data <- ScaleData(object = data, verbose = verbose)
-  data <- RunPCA(object = data, features = VariableFeatures(data), verbose = verbose)
-  data <- FindNeighbors(object = data, dims = dims_Neighbors, verbose = verbose)
-  data <- FindClusters( object = data, resolution = resolution, verbose = verbose)
-  data <- RunTSNE(object = data, dims = dims_TSNE)
-  data <- RunUMAP(object = data, dims = dims_UMAP, verbose = verbose)
+  data <- Seurat::NormalizeData(object = data, normalization.method = normalization.method, scale.factor = scale.factor, verbose = verbose)
+  data <- Seurat::FindVariableFeatures(object = data, selection.method = selection.method, verbose = verbose)
+  data <- Seurat::ScaleData(object = data, verbose = verbose)
+  data <- Seurat::RunPCA(object = data, features = Seurat::VariableFeatures(data), verbose = verbose)
+  data <- Seurat::FindNeighbors(object = data, dims = dims_Neighbors, verbose = verbose)
+  data <- Seurat::FindClusters(object = data, resolution = resolution, verbose = verbose)
+  data <- Seurat::RunTSNE(object = data, dims = dims_TSNE)
+  data <- Seurat::RunUMAP(object = data, dims = dims_UMAP, verbose = verbose)
 
   return(data)
 }
@@ -438,17 +439,16 @@ sparse.cor <- function(x){
 #'@return A seurat object or data frame containing the forecast results.
 #'
 #' @export
-scPAS.prediction <- function(model, test.data,assay='RNA', FDR.threshold=0.05,imputation=F,imputation_method= 'KNN',independent=T){
-
+scPAS.prediction <- function(model, test.data, assay = 'RNA', FDR.threshold = 0.05, imputation = FALSE, imputation_method = 'KNN', independent = TRUE){
 
   model <- model@misc$scPAS_para
 
-  if(any(class(test.data)=='Seurat')){
+  if(inherits(test.data, 'Seurat')){
     if(imputation){
-      test.data <- imputation(test.data,assay = assay,method = imputation_method)
-      assay <- DefaultAssay(test.data)
+      test.data <- imputation(test.data, assay = assay, method = imputation_method)
+      assay <- Seurat::DefaultAssay(test.data)
     }
-    test.exp <- GetAssayData(object = test.data, assay = assay,slot = 'data')
+    test.exp <- Seurat::GetAssayData(object = test.data, assay = assay, slot = 'data')
     Expression_cell <- test.exp
     rownames(Expression_cell) <- rownames(test.exp)
     colnames(Expression_cell) <- colnames(test.exp)
@@ -456,21 +456,20 @@ scPAS.prediction <- function(model, test.data,assay='RNA', FDR.threshold=0.05,im
 
   }else{
     test.exp <- as.matrix(test.data)
-    Expression_cell <-  as(preprocessCore::normalize.quantiles(as.matrix(test.exp)),'dgCMatrix')
+    Expression_cell <- methods::as(preprocessCore::normalize.quantiles(as.matrix(test.exp)), 'dgCMatrix')
     rownames(Expression_cell) <- rownames(test.exp)
     colnames(Expression_cell) <- colnames(test.exp)
   }
 
   Coefs <- model$Coefs
-  common <- intersect(names(Coefs),rownames(Expression_cell))
+  common <- intersect(names(Coefs), rownames(Expression_cell))
 
-  if(sum(Coefs!=0)<20){
+  if(sum(Coefs != 0) < 20){
     stop("There are too few valid features and the test data may not be suitable for the model!")
   }
 
-
   Coefs <- Coefs[common]
-  Expression_cell <- Expression_cell[common,]
+  Expression_cell <- Expression_cell[common, ]
   # Use base R scaling instead of Seurat internal function for compatibility
   scaled_exp <- t(scale(t(as.matrix(Expression_cell)), center = TRUE, scale = TRUE))
   scaled_exp <- Matrix::Matrix(scaled_exp, sparse = TRUE)
@@ -479,50 +478,47 @@ scPAS.prediction <- function(model, test.data,assay='RNA', FDR.threshold=0.05,im
   #scaled_exp <- as(scaled_exp, "sparseMatrix")
 
   scaled_exp[which(is.na(scaled_exp))] <- 0
-  risk_score <- crossprod(scaled_exp,Coefs)
+  risk_score <- crossprod(scaled_exp, Coefs)
 
   set.seed(12345)
 
-  randomPermutation <- sapply(1:2000,FUN = function(x){
-    set.seed(1234+x)
-    sample(Coefs,length(Coefs),replace = F)
+  randomPermutation <- sapply(1:2000, FUN = function(x){
+    set.seed(1234 + x)
+    sample(Coefs, length(Coefs), replace = FALSE)
   })
-  randomPermutation <- as(randomPermutation, "sparseMatrix")
-  risk_score.background <- crossprod(scaled_exp,randomPermutation)
+  randomPermutation <- methods::as(randomPermutation, "sparseMatrix")
+  risk_score.background <- crossprod(scaled_exp, randomPermutation)
 
   if(independent){
     mean.background <- rowMeans(risk_score.background)
-    sd.background <- apply(risk_score.background,1,sd)
+    sd.background <- apply(risk_score.background, 1, stats::sd)
   }else{
     mean.background <- mean(as.matrix(risk_score.background))
-    sd.background <- sd(as.matrix(risk_score.background))
+    sd.background <- stats::sd(as.matrix(risk_score.background))
   }
 
-  Z <- (risk_score[,1]-mean.background)/sd.background
+  Z <- (risk_score[,1] - mean.background) / sd.background
 
+  p.value <- stats::pnorm(q = abs(Z), mean = 0, sd = 1, lower.tail = FALSE)
+  q.value <- stats::p.adjust(p = p.value, method = 'BH')
 
-  p.value <- pnorm(q = abs(Z),mean = 0,sd = 1,lower.tail = F)
-  q.value <- p.adjust(p = p.value,method = 'BH')
-
-  risk_score_data.frame <- data.frame(sample=colnames(Expression_cell),
-                                      scPAS_RS=risk_score[,1],
-                                      scPAS_NRS=Z,
-                                      scPAS_Pvalue=p.value,
-                                      scPAS_FDR=q.value
+  risk_score_data.frame <- data.frame(
+    sample = colnames(Expression_cell),
+    scPAS_RS = risk_score[,1],
+    scPAS_NRS = Z,
+    scPAS_Pvalue = p.value,
+    scPAS_FDR = q.value,
+    stringsAsFactors = FALSE
   )
-  risk_score_data.frame$scPAS <- ifelse(Z>0 & q.value<=FDR.threshold,'scPAS+',ifelse(Z<0 & q.value<=FDR.threshold,'scPAS-','0'))
+  risk_score_data.frame$scPAS <- ifelse(Z > 0 & q.value <= FDR.threshold, 'scPAS+', 
+                                        ifelse(Z < 0 & q.value <= FDR.threshold, 'scPAS-', '0'))
 
-
-
-  if(any(class(test.data)=='Seurat')){
-
-    test.data <- AddMetaData(test.data, metadata = risk_score_data.frame$scPAS_RS, col.name = "scPAS_RS")
-
-    test.data <- AddMetaData(test.data, metadata = risk_score_data.frame$scPAS_NRS, col.name = "scPAS_NRS")
-
-    test.data <- AddMetaData(test.data, metadata = risk_score_data.frame$scPAS_Pvalue, col.name = "scPAS_Pvalue")
-    test.data <- AddMetaData(test.data, metadata = risk_score_data.frame$scPAS_FDR, col.name = "scPAS_FDR")
-    test.data <- AddMetaData(test.data, metadata = risk_score_data.frame$scPAS, col.name = "scPAS")
+  if(inherits(test.data, 'Seurat')){
+    test.data <- Seurat::AddMetaData(test.data, metadata = risk_score_data.frame$scPAS_RS, col.name = "scPAS_RS")
+    test.data <- Seurat::AddMetaData(test.data, metadata = risk_score_data.frame$scPAS_NRS, col.name = "scPAS_NRS")
+    test.data <- Seurat::AddMetaData(test.data, metadata = risk_score_data.frame$scPAS_Pvalue, col.name = "scPAS_Pvalue")
+    test.data <- Seurat::AddMetaData(test.data, metadata = risk_score_data.frame$scPAS_FDR, col.name = "scPAS_FDR")
+    test.data <- Seurat::AddMetaData(test.data, metadata = risk_score_data.frame$scPAS, col.name = "scPAS")
     return(test.data)
   }else{
     return(risk_score_data.frame)

@@ -1,12 +1,32 @@
 Package: scPAS
 Type: Package
-Title: A tool for identifying phenotype-associated single-cell subpopulations by integrating bulk and single-cell sequencing data (scPheno)
+Title: Single-Cell Phenotype-Associated Subpopulation Identifier
 Version: 0.2.1
-Author: c(person("Aimin", "Xie", role = c("aut", "cre"), email = "aiminyy1993@gmail.com"))
+Authors@R: c(
+    person("Aimin", "Xie", email = "aiminyy1993@gmail.com", role = c("aut", "cre")),
+    person("Zaoqu", "Liu", email = "liuzaoqu@163.com", role = "ctb", comment = "Seurat v4 compatibility")
+    )
 Maintainer: Aimin Xie <aiminyy1993@gmail.com>
+Description: Identifies phenotype-associated cell subpopulations from single-cell RNA-seq 
+    data by integrating bulk RNA-seq data with phenotype information. This package uses 
+    network-regularized sparse regression to quantify the strength of association between 
+    each cell and a phenotype (e.g., disease stage, tumor metastasis, treatment response, 
+    survival outcomes). Compatible with Seurat v4 (4.0.0-4.4.0) and SeuratObject v4 
+    (4.0.0-4.1.4). The method supports Gaussian (continuous), binomial (binary), and 
+    Cox (survival) regression families.
+URL: https://github.com/Zaoqu-Liu/scPAS
+BugReports: https://github.com/Zaoqu-Liu/scPAS/issues
 Depends: R (>= 4.0.5)
-Description: scPAS is a novel approach that utilizes the bulk phenotypes, such as disease stage, tumor metastasis, treatment response, and survival outcomes, to identify the most highly phenotype-associated cell subpopulations from single-cell data.
-Imports: Rcpp, Matrix, Seurat (>= 4.0.0), SeuratObject (>= 4.0.0), preprocessCore, survival
+Imports: 
+    Rcpp,
+    Matrix,
+    methods,
+    Seurat (>= 4.0.0),
+    SeuratObject (>= 4.0.0),
+    preprocessCore,
+    survival
+Suggests:
+    ALRA
 LinkingTo: Rcpp, RcppEigen
 License: GPL (>= 2)
 Encoding: UTF-8
