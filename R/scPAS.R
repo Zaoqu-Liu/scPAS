@@ -22,20 +22,31 @@
 #' @param network_class  The source of feature-feature similarity network. By default this is set to \code{sc} and the other one is \code{bulk}.
 #' @param family Character. Response type for the regression model.  It depends on the type of the given phenotype and
 #' can be \code{family = gaussian} for linear regression, \code{family = binomial} for classification, or \code{family = cox} for Cox regression.
+#' @param permutation_times Integer. Number of permutation iterations for statistical
+#'   significance testing (default: 2000). Higher values increase accuracy but also
+#'   computation time. Recommended: 1000-5000. For faster testing, use 500-1000.
 #' @param FDR.threshold Numeric. FDR value threshold for identifying phenotype-associated cells.
-#' The default is 0.05.
-#' @param independent Logical. The background distribution of risk scores is constructed independently of each cell.
+#'   The default is 0.05.
+#' @param n_cores Integer. Number of CPU cores to use for parallel permutation test
+#'   (default: 1 for sequential processing). Setting n_cores > 1 enables parallel
+#'   computing which can significantly speed up the analysis (2-4x faster with 4 cores).
+#'   Requires 'future' and 'future.apply' packages. If these packages are not available,
+#'   the function will automatically fall back to sequential processing.
+#' @param independent Logical. The background distribution of risk scores is constructed
+#'   independently of each cell.
 #'
-#' @return This function returns a Seurat object with the following components added to :
-#'   \item{scPAS_para}{ A list contains the final model parameters added to misc.}
-#'   \item{PAS result}{ A data frame containing risk scores (scPAS_RS), normalized risk scores (scPAS_NRS), p-value (scPAS_Pvalue) , adjusted p-value (scPAS_FDR) cell classification labels (scPAS) added to metaData.}
+#' @return This function returns a Seurat object with the following components added to:
+#'   \item{scPAS_para}{A list contains the final model parameters added to misc.}
+#'   \item{PAS result}{A data frame containing risk scores (scPAS_RS), normalized risk
+#'     scores (scPAS_NRS), p-value (scPAS_Pvalue), adjusted p-value (scPAS_FDR), and
+#'     cell classification labels (scPAS) added to metaData.}
 #'
 #' @import Seurat Matrix preprocessCore
 #'
 #' @export
 scPAS <- function(bulk_dataset, sc_dataset, phenotype,assay = 'RNA', tag = NULL,nfeature = NULL,imputation=T,imputation_method=c('KNN','ALRA'),
                     alpha = NULL,network_class=c('SC','bulk'),independent=T, family = c("gaussian","binomial","cox"),permutation_times=2000,
-                    FDR.threshold = 0.05){
+                    FDR.threshold = 0.05, n_cores = 1){
   # Packages loaded via Imports in DESCRIPTION
   network_class <- match.arg(network_class)
   family <- match.arg(family)
@@ -169,26 +180,32 @@ scPAS <- function(bulk_dataset, sc_dataset, phenotype,assay = 'RNA', tag = NULL,
 
   message("Step 5: Calculating quantified risk scores....")
   names(Coefs) <- colnames(x)
-  # Use base R scaling instead of Seurat internal function for compatibility
-  scaled_exp <- t(scale(t(as.matrix(Expression_cell)), center = TRUE, scale = TRUE))
-  scaled_exp <- Matrix::Matrix(scaled_exp, sparse = TRUE)
-
+  
+  # Use sparse-aware scaling to preserve sparsity and reduce memory usage
+  scaled_exp <- sparse_row_scale(Expression_cell, center = TRUE, scale = TRUE)
   colnames(scaled_exp) <- colnames(Expression_cell)
   rownames(scaled_exp) <- rownames(Expression_cell)
   scaled_exp[which(is.na(scaled_exp))] <- 0
-  scaled_exp <- as(scaled_exp, "sparseMatrix")
-  risk_score <- crossprod(scaled_exp, Coefs)
-
-  message(paste0("Step 6: Qualitative identification by permutation test program with ", as.character(permutation_times), " random perturbations"))
-
-  set.seed(12345)
-
-  randomPermutation <- sapply(1:permutation_times, FUN = function(x){
-    set.seed(1234 + x)
-    sample(Coefs, length(Coefs), replace = FALSE)
-  })
-  randomPermutation <- methods::as(randomPermutation, "sparseMatrix")
-  risk_score.background <- crossprod(scaled_exp, randomPermutation)
+  
+  # Parallel permutation test for better performance
+  if (n_cores > 1) {
+    message(paste0("Step 6: Qualitative identification by permutation test (", 
+                  permutation_times, " permutations, ", n_cores, " cores)"))
+  } else {
+    message(paste0("Step 6: Qualitative identification by permutation test (", 
+                  permutation_times, " permutations, sequential)"))
+  }
+  
+  perm_results <- parallel_permutation_test(
+    scaled_exp = scaled_exp,
+    Coefs = Coefs,
+    permutation_times = permutation_times,
+    n_cores = n_cores,
+    seed = 12345
+  )
+  
+  risk_score <- perm_results$risk_score
+  risk_score.background <- perm_results$risk_score.background
   if(independent){
     mean.background <- rowMeans(risk_score.background)
     sd.background <- apply(risk_score.background, 1, stats::sd)
@@ -475,13 +492,11 @@ scPAS.prediction <- function(model, test.data, assay = 'RNA', FDR.threshold = 0.
 
   Coefs <- Coefs[common]
   Expression_cell <- Expression_cell[common, ]
-  # Use base R scaling instead of Seurat internal function for compatibility
-  scaled_exp <- t(scale(t(as.matrix(Expression_cell)), center = TRUE, scale = TRUE))
-  scaled_exp <- Matrix::Matrix(scaled_exp, sparse = TRUE)
+  
+  # Use sparse-aware scaling to preserve sparsity
+  scaled_exp <- sparse_row_scale(Expression_cell, center = TRUE, scale = TRUE)
   colnames(scaled_exp) <- colnames(Expression_cell)
   rownames(scaled_exp) <- rownames(Expression_cell)
-  #scaled_exp <- as(scaled_exp, "sparseMatrix")
-
   scaled_exp[which(is.na(scaled_exp))] <- 0
   risk_score <- crossprod(scaled_exp, Coefs)
 
