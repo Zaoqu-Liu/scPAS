@@ -412,18 +412,23 @@ imputation_KNN <- function (obj,assay='RNA', LogNormalized = TRUE)
 #'
 #'
 sparse.cor <- function(x){
+  # Ensure x is a sparse matrix
+  if(!methods::is(x, "sparseMatrix")){
+    x <- methods::as(x, "sparseMatrix")
+  }
+  
   n <- nrow(x)
   m <- ncol(x)
-  ii <- unique(x@i)+1 # rows with a non-zero element
+  ii <- unique(x@i) + 1 # rows with a non-zero element
 
   Ex <- colMeans(x)
-  nozero <- as.vector(x[ii,]) - rep(Ex,each=length(ii))        # colmeans
+  nozero <- as.vector(x[ii, ]) - rep(Ex, each = length(ii))
 
-  covmat <- ( crossprod(matrix(nozero,ncol=m)) +
-                crossprod(t(Ex))*(n-length(ii))
-  )/(n-1)
+  covmat <- (crossprod(matrix(nozero, ncol = m)) +
+              Matrix::tcrossprod(Ex) * (n - length(ii))
+  ) / (n - 1)
   sdvec <- sqrt(diag(covmat))
-  covmat/crossprod(t(sdvec))
+  covmat / Matrix::tcrossprod(sdvec)
 }
 
 
