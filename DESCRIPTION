@@ -1,7 +1,7 @@
 Package: scPAS
 Type: Package
 Title: Single-Cell Phenotype-Associated Subpopulation Identifier
-Version: 1.0.0
+Version: 1.0.2
 Authors@R: c(
     person("Aimin", "Xie", email = "aiminyy1993@gmail.com", role = "aut", comment = "Original author"),
     person("Zaoqu", "Liu", email = "liuzaoqu@163.com", role = c("aut", "cre"), 
@@ -14,15 +14,17 @@ Description: Identifies phenotype-associated cell subpopulations from single-cel
     each cell and a phenotype (e.g., disease stage, tumor metastasis, treatment response, 
     survival outcomes). Compatible with Seurat v4 (4.0.0-4.4.0) and SeuratObject v4 
     (4.0.0-4.1.4). The method supports Gaussian (continuous), binomial (binary), and 
-    Cox (survival) regression families. Version 1.0.0 includes critical bug fixes for 
-    sparse matrix operations, improved robustness, and parallel computing support.
+    Cox (survival) regression families. Version 1.0.2 includes full cross-platform 
+    compatibility (Windows, macOS, Linux) with proper DLL/SO loading.
 URL: https://github.com/Zaoqu-Liu/scPAS
 BugReports: https://github.com/Zaoqu-Liu/scPAS/issues
-Depends: R (>= 4.0.5)
+Depends: R (>= 4.0.0)
 Imports: 
-    Rcpp,
+    Rcpp (>= 1.0.0),
     Matrix,
     methods,
+    stats,
+    utils,
     Seurat (>= 4.0.0),
     SeuratObject (>= 4.0.0),
     preprocessCore,
@@ -30,9 +32,15 @@ Imports:
 Suggests:
     ALRA,
     future,
-    future.apply
+    future.apply,
+    testthat (>= 3.0.0),
+    knitr,
+    rmarkdown
 LinkingTo: Rcpp, RcppEigen
 License: GPL (>= 2)
 Encoding: UTF-8
 LazyData: true
+NeedsCompilation: yes
 RoxygenNote: 7.3.3
+SystemRequirements: C++11, GNU make
+Biarch: true
