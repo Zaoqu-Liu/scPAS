@@ -16,9 +16,9 @@ vignette: >
 
 ```{r setup, include = FALSE}
 knitr::opts_chunk$set(
-  collapse = TRUE,
-  comment = "#>",
-  root.dir = "./",
+	collapse = TRUE,
+	comment = "#>",
+	root.dir = "./",
   warning = FALSE, 
   message = FALSE,
   eval = FALSE  # Set to TRUE if you have the data files

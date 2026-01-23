@@ -62,7 +62,7 @@ can be \code{family = gaussian} for linear regression, \code{family = binomial} 
   computation time. Recommended: 1000-5000. For faster testing, use 500-1000.}
 
 \item{FDR.threshold}{Numeric. FDR value threshold for identifying phenotype-associated cells.
-  The default is 0.05.}
+The default is 0.05.}
 
 \item{n_cores}{Integer. Number of CPU cores to use for parallel permutation test
   (default: 1 for sequential processing). Setting n_cores > 1 enables parallel

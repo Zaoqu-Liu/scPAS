@@ -48,7 +48,7 @@ scPAS <- function(bulk_dataset, sc_dataset, phenotype, assay = 'RNA', tag = NULL
                   nfeature = NULL, do_imputation = TRUE, imputation_method = c('KNN','ALRA'),
                   alpha = NULL, network_class = c('SC','bulk'), independent = TRUE, 
                   family = c("gaussian","binomial","cox"), permutation_times = 2000,
-                  FDR.threshold = 0.05, n_cores = 1){
+                    FDR.threshold = 0.05, n_cores = 1){
   
   # ============ Input Validation ============
   # Validate bulk_dataset
@@ -140,7 +140,7 @@ scPAS <- function(bulk_dataset, sc_dataset, phenotype, assay = 'RNA', tag = NULL
   # ============ Main Processing ============
   # Set default assay for Seurat object
   if (inherits(sc_dataset, 'Seurat')) {
-    Seurat::DefaultAssay(sc_dataset) <- assay
+  Seurat::DefaultAssay(sc_dataset) <- assay
   }
 
   if(inherits(sc_dataset, 'Seurat')){
@@ -195,7 +195,7 @@ scPAS <- function(bulk_dataset, sc_dataset, phenotype, assay = 'RNA', tag = NULL
   }
 
   message("Step 2: Extracting single-cell expression profiles....")
-  sc_exprs <- Seurat::GetAssayData(object = sc_dataset, assay = assay, slot = 'data')
+  sc_exprs <- Seurat::GetAssayData(object = sc_dataset, assay = assay, layer = 'data')
   #Expression_cell <- as(preprocessCore::normalize.quantiles(as.matrix(sc_exprs)), "dgCMatrix")
   Expression_cell <- sc_exprs
   rownames(Expression_cell) <- rownames(sc_exprs)
@@ -239,7 +239,7 @@ scPAS <- function(bulk_dataset, sc_dataset, phenotype, assay = 'RNA', tag = NULL
     y <- as.numeric(phenotype)
     z <- table(y)
     if (!is.null(tag) && length(tag) >= 2) {
-      message(sprintf("Current phenotype contains %d %s and %d %s samples.", z[1], tag[1], z[2], tag[2]))
+    message(sprintf("Current phenotype contains %d %s and %d %s samples.", z[1], tag[1], z[2], tag[2]))
     } else {
       message(sprintf("Current phenotype contains %d class-0 and %d class-1 samples.", z[1], z[2]))
     }
@@ -494,7 +494,7 @@ imputation_ALRA <- function(obj,assay='RNA'){
   if (!requireNamespace("ALRA", quietly = TRUE)) {
     stop("Package 'ALRA' is required for ALRA imputation. Please install it with: install.packages('ALRA')")
   }
-  data <- Seurat::GetAssayData(object = obj, assay = assay,slot = 'data')
+  data <- Seurat::GetAssayData(object = obj, assay = assay, layer = 'data')
   data_alra <- t(ALRA::alra(t(as.matrix(data)))[[3]])
   colnames(data_alra) <- colnames(data)
   data_alra <- Matrix::Matrix(data_alra, sparse = TRUE)
@@ -519,7 +519,7 @@ imputation_ALRA <- function(obj,assay='RNA'){
 imputation_KNN <- function (obj,assay='RNA', LogNormalized = TRUE)
 {
   # Matrix functions available via Imports
-  exp_sc <- Seurat::GetAssayData(object = obj, assay = assay, slot = 'data')
+  exp_sc <- Seurat::GetAssayData(object = obj, assay = assay, layer = 'data')
   nn_network <- obj@graphs[[paste0(assay, "_nn")]]
   
   if (!methods::is(object = exp_sc, class2 = "sparseMatrix")) {
@@ -658,7 +658,7 @@ sparse.cor <- function(x){
 scPAS.prediction <- function(model, test.data, assay = 'RNA', FDR.threshold = 0.05, 
                              do_imputation = FALSE, imputation_method = 'KNN', 
                              independent = TRUE, permutation_times = 2000, n_cores = 1){
-  
+
   # Validate inputs
   if (!inherits(model, 'Seurat')) {
     stop("'model' must be a Seurat object returned by scPAS()")
@@ -674,7 +674,7 @@ scPAS.prediction <- function(model, test.data, assay = 'RNA', FDR.threshold = 0.
       test.data <- imputation(test.data, assay = assay, method = imputation_method)
       assay <- Seurat::DefaultAssay(test.data)
     }
-    test.exp <- Seurat::GetAssayData(object = test.data, assay = assay, slot = 'data')
+    test.exp <- Seurat::GetAssayData(object = test.data, assay = assay, layer = 'data')
     Expression_cell <- test.exp
     rownames(Expression_cell) <- rownames(test.exp)
     colnames(Expression_cell) <- colnames(test.exp)
@@ -687,14 +687,14 @@ scPAS.prediction <- function(model, test.data, assay = 'RNA', FDR.threshold = 0.
 
   Coefs <- model_params$Coefs
   common <- intersect(names(Coefs), rownames(Expression_cell))
-  
+
   # Check feature overlap
   n_nonzero_coefs <- sum(Coefs[common] != 0)
   if(n_nonzero_coefs < 20){
     warning(sprintf("Only %d non-zero features overlap between model and test data. Results may be unreliable.", n_nonzero_coefs))
     if(n_nonzero_coefs == 0){
       stop("No valid features found. The test data may not be suitable for this model.")
-    }
+  }
   }
   
   message(sprintf("Using %d common features (%d with non-zero coefficients)", 

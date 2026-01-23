@@ -26,7 +26,7 @@ scPAS.prediction(
 \item{assay}{Name of Assay to get.}
 
 \item{FDR.threshold}{Numeric. FDR value threshold for identifying phenotype-associated cells.
-  The default is 0.05.}
+The default is 0.05.}
 
 \item{do_imputation}{Logical. Whether to perform imputation on the test data (default: FALSE).}
 

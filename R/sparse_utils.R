@@ -67,7 +67,7 @@ sparse_row_scale <- function(x, center = TRUE, scale = TRUE) {
       D_inv <- Matrix::Diagonal(x = 1 / row_sds)
       x_scaled <- D_inv %*% x_scaled
     } else {
-      x_scaled <- x_scaled / row_sds
+    x_scaled <- x_scaled / row_sds
     }
   }
   
