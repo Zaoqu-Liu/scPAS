@@ -3,8 +3,7 @@
 NULL
 
 .onLoad <- function(libname, pkgname) {
-  # Ensure the dynamic library is loaded properly
-  # This is critical for Windows compatibility
+  # Dynamic library initialization
 }
 
 .onUnload <- function(libpath) {

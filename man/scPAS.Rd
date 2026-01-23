@@ -11,14 +11,15 @@ scPAS(
   assay = "RNA",
   tag = NULL,
   nfeature = NULL,
-  imputation = T,
+  do_imputation = TRUE,
   imputation_method = c("KNN", "ALRA"),
   alpha = NULL,
   network_class = c("SC", "bulk"),
-  independent = T,
+  independent = TRUE,
   family = c("gaussian", "binomial", "cox"),
   permutation_times = 2000,
-  FDR.threshold = 0.05
+  FDR.threshold = 0.05,
+  n_cores = 1
 )
 }
 \arguments{
@@ -42,7 +43,7 @@ binary group indicator vector, or clinical survival data:
 
 \item{nfeature}{Numeric. The Number of features to select as top variable features in sc_dataset. Top variable features will be used to intersect with the features of bulk_dataset. Default is NULL.All features will be used.}
 
-\item{imputation}{Logical. imputation or not.}
+\item{do_imputation}{Logical. Whether to perform imputation on single-cell data (default: TRUE).}
 
 \item{imputation_method}{Character. Name of alternative method for imputation.}
 
@@ -56,8 +57,17 @@ If \code{alpha = NULL}, a default searching vector is used. The range of alpha i
 \item{family}{Character. Response type for the regression model.  It depends on the type of the given phenotype and
 can be \code{family = gaussian} for linear regression, \code{family = binomial} for classification, or \code{family = cox} for Cox regression.}
 
+\item{permutation_times}{Integer. Number of permutation iterations for statistical
+  significance testing (default: 2000). Higher values increase accuracy but also
+  computation time. Recommended: 1000-5000. For faster testing, use 500-1000.}
+
 \item{FDR.threshold}{Numeric. FDR value threshold for identifying phenotype-associated cells.
-The default is 0.05.}
+  The default is 0.05.}
+
+\item{n_cores}{Integer. Number of CPU cores to use for parallel permutation test
+  (default: 1 for sequential processing). Setting n_cores > 1 enables parallel
+  computing which can significantly speed up the analysis (2-4x faster with 4 cores).
+  Requires 'future' and 'future.apply' packages.}
 }
 \value{
 This function returns a Seurat object with the following components added to :

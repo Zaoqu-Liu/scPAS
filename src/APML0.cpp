@@ -17,6 +17,10 @@ List scaleC(Eigen::MatrixXd X){
     mX(i)=X.col(i).mean();
     X.col(i)=X.col(i).array()-mX(i);
     sdX(i)=sqrt(X.col(i).squaredNorm()/N);
+    // Avoid division by zero for constant columns
+    if (sdX(i) < 1e-10) {
+      sdX(i) = 1.0;
+    }
     X.col(i)/=sdX(i);
   }
   return List::create(Named("x")=X, Named("sd")=sdX, Named("m")=mX);
@@ -44,7 +48,12 @@ List OmegaC(Eigen::MatrixXd & Omega, Eigen::VectorXi & sgn){
     j=0;
     for(Eigen::SparseMatrix<double>::InnerIterator it(OmegaS, i);it;++it){
       loc(j++, i)=it.index();
-      OmegaS.coeffRef(it.index(), i)=it.value()*sgn(i)*sgn(it.index())/sqrt(ndegree(i)*ndegree(it.index()));
+      // Avoid division by zero for isolated nodes
+      double denom = sqrt(ndegree(i)*ndegree(it.index()));
+      if (denom < 1e-10) {
+        denom = 1.0;
+      }
+      OmegaS.coeffRef(it.index(), i)=it.value()*sgn(i)*sgn(it.index())/denom;
     }
   }
 
@@ -70,7 +79,12 @@ List OmegaSC(Eigen::SparseMatrix<double> & OmegaS, Eigen::VectorXi & sgn){
     j=0;
     for(Eigen::SparseMatrix<double>::InnerIterator it(OmegaS, i);it;++it){
       loc(j++, i)=it.index();
-      OmegaS.coeffRef(it.index(), i)=it.value()*sgn(i)*sgn(it.index())/sqrt(ndegree(i)*ndegree(it.index()));
+      // Avoid division by zero for isolated nodes
+      double denom = sqrt(ndegree(i)*ndegree(it.index()));
+      if (denom < 1e-10) {
+        denom = 1.0;
+      }
+      OmegaS.coeffRef(it.index(), i)=it.value()*sgn(i)*sgn(it.index())/denom;
     }
   }
 
@@ -240,6 +254,7 @@ List EnetLmC(Eigen::MatrixXd X, Eigen::VectorXd y,
     mX(i)=X.col(i).mean();
     X.col(i)=X.col(i).array()-mX(i);
     sdX(i)=sqrt(X.col(i).squaredNorm()/N0);
+    if (sdX(i) < 1e-10) sdX(i) = 1.0;  // Avoid division by zero
     X.col(i)/=sdX(i);
   }
   my=y.mean();
@@ -381,6 +396,7 @@ List cvEnetLmC(Eigen::MatrixXd X, Eigen::VectorXd y,
     mX(i)=X.col(i).mean();
     X.col(i)=X.col(i).array()-mX(i);
     sdX(i)=sqrt(X.col(i).squaredNorm()/N);
+    if (sdX(i) < 1e-10) sdX(i) = 1.0;  // Avoid division by zero
     X.col(i)/=sdX(i);
   }
   my=y.mean();
@@ -513,6 +529,7 @@ List NetLmC(Eigen::MatrixXd & X, Eigen::VectorXd & y, double alpha,
     mX(i)=X.col(i).mean();
     X.col(i)=X.col(i).array()-mX(i);
     sdX(i)=sqrt(X.col(i).squaredNorm()/N0);
+    if (sdX(i) < 1e-10) sdX(i) = 1.0;  // Avoid division by zero
     X.col(i)/=sdX(i);
   }
   my=y.mean();
@@ -672,6 +689,7 @@ List cvNetLmC(Eigen::MatrixXd & X, Eigen::VectorXd & y,double alpha,
     mX(i)=X.col(i).mean();
     X.col(i)=X.col(i).array()-mX(i);
     sdX(i)=sqrt(X.col(i).squaredNorm()/N);
+    if (sdX(i) < 1e-10) sdX(i) = 1.0;  // Avoid division by zero
     X.col(i)/=sdX(i);
   }
   my=y.mean();
@@ -1024,6 +1042,7 @@ List EnetCoxC(Eigen::MatrixXd X, Eigen::VectorXd tevent,
     mX(i)=X.col(i).mean();
     X.col(i)=X.col(i).array()-mX(i);
     sdX(i)=sqrt(X.col(i).squaredNorm()/N0);
+    if (sdX(i) < 1e-10) sdX(i) = 1.0;  // Avoid division by zero
     X.col(i)/=sdX(i);
   }
 
@@ -1154,6 +1173,7 @@ List cvEnetCoxC(Eigen::MatrixXd X, Eigen::VectorXd tevent,
     mX(i)=X.col(i).mean();
     X.col(i)=X.col(i).array()-mX(i);
     sdX(i)=sqrt(X.col(i).squaredNorm()/N0);
+    if (sdX(i) < 1e-10) sdX(i) = 1.0;  // Avoid division by zero
     X.col(i)/=sdX(i);
 
     mxi=XF.col(i).mean();
@@ -1282,6 +1302,7 @@ List NetCoxC(Eigen::MatrixXd & X, Eigen::VectorXd tevent, double alpha,
     mX(i)=X.col(i).mean();
     X.col(i)=X.col(i).array()-mX(i);
     sdX(i)=sqrt(X.col(i).squaredNorm()/N0);
+    if (sdX(i) < 1e-10) sdX(i) = 1.0;  // Avoid division by zero
     X.col(i)/=sdX(i);
   }
 
@@ -1433,6 +1454,7 @@ List cvNetCoxC(Eigen::MatrixXd & X, Eigen::VectorXd tevent, double alpha,
     mX(i)=X.col(i).mean();
     X.col(i)=X.col(i).array()-mX(i);
     sdX(i)=sqrt(X.col(i).squaredNorm()/N0);
+    if (sdX(i) < 1e-10) sdX(i) = 1.0;  // Avoid division by zero
     X.col(i)/=sdX(i);
 
     mxi=XF.col(i).mean();
@@ -1755,6 +1777,7 @@ List EnetLogC(Eigen::MatrixXd X, Eigen::VectorXd y,
     mX(i)=X.col(i).mean();
     X.col(i)=X.col(i).array()-mX(i);
     sdX(i)=sqrt(X.col(i).squaredNorm()/N0);
+    if (sdX(i) < 1e-10) sdX(i) = 1.0;  // Avoid division by zero
     X.col(i)/=sdX(i);
     X2.col(i)=X.col(i).array()*X.col(i).array();
   }
@@ -1923,6 +1946,7 @@ List cvEnetLogC(Eigen::MatrixXd X, Eigen::VectorXd y,
     mX(i)=X.col(i).mean();
     X.col(i)=X.col(i).array()-mX(i);
     sdX(i)=sqrt(X.col(i).squaredNorm()/N0);
+    if (sdX(i) < 1e-10) sdX(i) = 1.0;  // Avoid division by zero
     X.col(i)/=sdX(i);
     X2.col(i)=X.col(i).array()*X.col(i).array();
   }
@@ -2109,6 +2133,7 @@ List NetLogC(Eigen::MatrixXd X, Eigen::VectorXd y,
     mX(i)=X.col(i).mean();
     X.col(i)=X.col(i).array()-mX(i);
     sdX(i)=sqrt(X.col(i).squaredNorm()/N0);
+    if (sdX(i) < 1e-10) sdX(i) = 1.0;  // Avoid division by zero
     X.col(i)/=sdX(i);
     X2.col(i)=X.col(i).array()*X.col(i).array();
   }
@@ -2292,6 +2317,7 @@ List cvNetLogC(Eigen::MatrixXd X, Eigen::VectorXd y,
     mX(i)=X.col(i).mean();
     X.col(i)=X.col(i).array()-mX(i);
     sdX(i)=sqrt(X.col(i).squaredNorm()/N0);
+    if (sdX(i) < 1e-10) sdX(i) = 1.0;  // Avoid division by zero
     X.col(i)/=sdX(i);
     X2.col(i)=X.col(i).array()*X.col(i).array();
   }

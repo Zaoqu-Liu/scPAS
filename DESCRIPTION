@@ -1,7 +1,7 @@
 Package: scPAS
 Type: Package
 Title: Single-Cell Phenotype-Associated Subpopulation Identifier
-Version: 1.0.2
+Version: 1.0.3
 Authors@R: c(
     person("Aimin", "Xie", email = "aiminyy1993@gmail.com", role = "aut", comment = "Original author"),
     person("Zaoqu", "Liu", email = "liuzaoqu@163.com", role = c("aut", "cre"), 
@@ -35,12 +35,19 @@ Suggests:
     future.apply,
     testthat (>= 3.0.0),
     knitr,
-    rmarkdown
+    rmarkdown,
+    ggplot2,
+    patchwork,
+    RColorBrewer,
+    survminer,
+    dplyr,
+    reshape2
+VignetteBuilder: knitr
 LinkingTo: Rcpp, RcppEigen
-License: GPL (>= 2)
+License: GPL-3
 Encoding: UTF-8
 LazyData: true
 NeedsCompilation: yes
 RoxygenNote: 7.3.3
-SystemRequirements: C++11, GNU make
+SystemRequirements: GNU make
 Biarch: true

@@ -1,0 +1,548 @@
+---
+title: "Case Study: Binary Classification"
+author: 
+  - name: "Zaoqu Liu"
+    email: "liuzaoqu@163.com"
+    affiliation: "Department of Interventional Radiology, The First Affiliated Hospital of Zhengzhou University"
+    orcid: "0000-0002-0452-742X"
+  - name: "Aimin Xie"
+    email: "aiminyy1993@gmail.com"
+    affiliation: "Original Author"
+date: "`r Sys.Date()`"
+output: 
+  rmarkdown::html_vignette:
+    toc: true
+    toc_depth: 3
+    number_sections: true
+vignette: >
+  %\VignetteIndexEntry{Case Study: Binary Classification}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 8,
+  fig.height = 6,
+  warning = FALSE,
+  message = FALSE,
+  dpi = 150
+)
+```
+
+# Introduction
+
+This case study demonstrates how to use scPAS with **binary classification** to identify cell subpopulations associated with treatment response (responders vs. non-responders).
+
+## Biological Question
+
+> Which immune cell populations are associated with response to immunotherapy?
+
+## Clinical Context
+
+Immune checkpoint inhibitor (ICI) therapy has revolutionized cancer treatment, but only a subset of patients respond. Understanding which cell populations predict response can help:
+
+- Identify biomarkers for patient selection
+- Understand mechanisms of resistance
+- Develop combination therapies
+
+# Setup
+
+```{r load-packages}
+library(scPAS)
+library(Seurat)
+library(Matrix)
+library(ggplot2)
+library(RColorBrewer)
+library(patchwork)
+library(dplyr)
+
+theme_set(theme_minimal())
+```
+
+# Simulated Immunotherapy Data
+
+## Single-Cell Data: Pre-treatment Tumor Biopsies
+
+```{r simulate-sc-data}
+set.seed(42)
+
+n_genes <- 600
+n_cells <- 1200
+
+# Create count matrix
+counts <- matrix(
+  rpois(n_genes * n_cells, lambda = 4),
+  nrow = n_genes,
+  ncol = n_cells
+)
+rownames(counts) <- paste0("Gene", 1:n_genes)
+colnames(counts) <- paste0("Cell", 1:n_cells)
+
+# Create Seurat object
+ici_sc <- CreateSeuratObject(counts = counts, project = "ICI_Response")
+
+# Define cell types (immune-focused)
+cell_types <- c(
+  rep("CD8_naive", 100),
+  rep("CD8_effector", 150),
+  rep("CD8_exhausted", 200),
+  rep("CD8_memory", 80),
+  rep("CD4_helper", 150),
+  rep("Treg", 120),
+  rep("NK_cytotoxic", 80),
+  rep("NK_regulatory", 60),
+  rep("Monocyte", 100),
+  rep("DC_cDC1", 60),
+  rep("DC_cDC2", 50),
+  rep("B_cell", 50)
+)
+ici_sc$celltype <- cell_types
+
+# Standard preprocessing
+ici_sc <- NormalizeData(ici_sc, verbose = FALSE)
+ici_sc <- FindVariableFeatures(ici_sc, nfeatures = 400, verbose = FALSE)
+ici_sc <- ScaleData(ici_sc, verbose = FALSE)
+ici_sc <- RunPCA(ici_sc, npcs = 30, verbose = FALSE)
+ici_sc <- RunUMAP(ici_sc, dims = 1:20, verbose = FALSE)
+
+# Cell type colors
+ct_colors <- c(
+  "CD8_naive" = "#66C2A5",
+  "CD8_effector" = "#FC8D62",
+  "CD8_exhausted" = "#8DA0CB",
+  "CD8_memory" = "#E78AC3",
+  "CD4_helper" = "#A6D854",
+  "Treg" = "#FFD92F",
+  "NK_cytotoxic" = "#E5C494",
+  "NK_regulatory" = "#B3B3B3",
+  "Monocyte" = "#E41A1C",
+  "DC_cDC1" = "#377EB8",
+  "DC_cDC2" = "#4DAF4A",
+  "B_cell" = "#984EA3"
+)
+
+DimPlot(ici_sc, group.by = "celltype", cols = ct_colors, label = TRUE, repel = TRUE) +
+  ggtitle("Pre-treatment Tumor Immune Landscape")
+```
+
+## Bulk Data: Pre-treatment with Response Annotation
+
+```{r simulate-bulk-data}
+set.seed(789)
+
+# 60 patients: 25 responders, 35 non-responders
+n_responders <- 25
+n_nonresponders <- 35
+n_bulk <- n_responders + n_nonresponders
+
+# Create bulk expression
+bulk_data <- matrix(
+  rnorm(n_genes * n_bulk, mean = 10, sd = 2),
+  nrow = n_genes,
+  ncol = n_bulk
+)
+rownames(bulk_data) <- paste0("Gene", 1:n_genes)
+colnames(bulk_data) <- paste0("Patient", 1:n_bulk)
+
+# Create binary phenotype (0 = non-responder, 1 = responder)
+response_phenotype <- c(rep(1, n_responders), rep(0, n_nonresponders))
+names(response_phenotype) <- colnames(bulk_data)
+
+# Summary
+cat("Total patients:", n_bulk, "\n")
+cat("Responders (1):", sum(response_phenotype == 1), "\n")
+cat("Non-responders (0):", sum(response_phenotype == 0), "\n")
+cat("Response rate:", round(mean(response_phenotype) * 100, 1), "%\n")
+```
+
+## Visualize Response Distribution
+
+```{r response-distribution, fig.width=8, fig.height=4}
+response_df <- data.frame(
+  Patient = names(response_phenotype),
+  Response = factor(response_phenotype, levels = c(0, 1), labels = c("Non-responder", "Responder"))
+)
+
+ggplot(response_df, aes(x = Response, fill = Response)) +
+  geom_bar(width = 0.6) +
+  scale_fill_manual(values = c("Non-responder" = "#E74C3C", "Responder" = "#27AE60")) +
+  geom_text(stat = "count", aes(label = after_stat(count)), vjust = -0.5, size = 5) +
+  labs(
+    x = "",
+    y = "Number of Patients",
+    title = "Treatment Response Distribution"
+  ) +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(hjust = 0.5, face = "bold")
+  )
+```
+
+# Run scPAS with Binomial Family
+
+```{r run-scpas-binomial}
+# Run scPAS analysis
+result <- scPAS(
+  bulk_dataset = bulk_data,
+  sc_dataset = ici_sc,
+  phenotype = response_phenotype,
+  family = "binomial",
+  tag = c("Non-responder", "Responder"),  # Labels for 0 and 1
+  nfeature = 250,
+  permutation_times = 200,  # Use 1000+ in practice
+  do_imputation = FALSE,
+  n_cores = 1,
+  FDR.threshold = 0.05
+)
+
+# Summary
+cat("\n=== scPAS Results ===\n")
+cat("Total cells:", ncol(result), "\n")
+cat("scPAS+ (Response-associated):", sum(result$scPAS == "scPAS+", na.rm = TRUE), "\n")
+cat("scPAS- (Non-response-associated):", sum(result$scPAS == "scPAS-", na.rm = TRUE), "\n")
+cat("Non-significant:", sum(result$scPAS == "0", na.rm = TRUE), "\n")
+```
+
+# Visualize Results
+
+## UMAP Overview
+
+```{r umap-results, fig.width=14, fig.height=5}
+# Classification colors
+class_colors <- c(
+  "scPAS-" = "#E74C3C",   # Non-responder associated (red)
+  "0" = "gray80",
+  "scPAS+" = "#27AE60"    # Responder associated (green)
+)
+
+p1 <- DimPlot(result, group.by = "celltype", cols = ct_colors, label = TRUE, label.size = 3) +
+  ggtitle("Cell Types") + NoLegend()
+
+p2 <- FeaturePlot(result, features = "scPAS_NRS") +
+  scale_color_gradient2(
+    low = "#E74C3C", mid = "white", high = "#27AE60",
+    midpoint = 0, name = "Response\nScore"
+  ) +
+  ggtitle("Response Association Score")
+
+p3 <- DimPlot(result, group.by = "scPAS", cols = class_colors,
+              order = c("0", "scPAS-", "scPAS+")) +
+  ggtitle("Response Prediction")
+
+p1 | p2 | p3
+```
+
+## Cell Type Response Association
+
+```{r celltype-response, fig.width=12, fig.height=5}
+# Calculate mean score per cell type
+celltype_scores <- result@meta.data %>%
+  group_by(celltype) %>%
+  summarise(
+    mean_NRS = mean(scPAS_NRS, na.rm = TRUE),
+    median_NRS = median(scPAS_NRS, na.rm = TRUE),
+    n_cells = n(),
+    pct_positive = sum(scPAS == "scPAS+", na.rm = TRUE) / n() * 100,
+    pct_negative = sum(scPAS == "scPAS-", na.rm = TRUE) / n() * 100
+  ) %>%
+  arrange(desc(mean_NRS))
+
+# Bar plot of mean scores
+ggplot(celltype_scores, aes(x = reorder(celltype, mean_NRS), y = mean_NRS, 
+                            fill = mean_NRS > 0)) +
+  geom_bar(stat = "identity", width = 0.7) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray40") +
+  scale_fill_manual(values = c("TRUE" = "#27AE60", "FALSE" = "#E74C3C"),
+                    labels = c("Non-responder", "Responder")) +
+  coord_flip() +
+  labs(
+    x = "",
+    y = "Mean Response Score",
+    title = "Cell Type Association with Treatment Response",
+    fill = "Associated with"
+  ) +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold")
+  )
+```
+
+## Detailed Violin Plot
+
+```{r violin-response, fig.width=14, fig.height=6}
+# Order by mean score
+result$celltype <- factor(result$celltype, levels = celltype_scores$celltype)
+
+VlnPlot(result, features = "scPAS_NRS", group.by = "celltype",
+        cols = ct_colors[celltype_scores$celltype], pt.size = 0) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray40", size = 0.8) +
+  stat_summary(fun = mean, geom = "point", size = 3, color = "black") +
+  labs(
+    x = "Cell Type (ordered by mean response score)",
+    y = "Response Association Score",
+    title = "Treatment Response Score Distribution by Cell Type"
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "none",
+    plot.title = element_text(hjust = 0.5, face = "bold")
+  ) +
+  annotate("text", x = 0.5, y = max(result$scPAS_NRS, na.rm = TRUE) * 0.9,
+           label = "Responder (+)", color = "#27AE60", hjust = 0, fontface = "bold") +
+  annotate("text", x = 0.5, y = min(result$scPAS_NRS, na.rm = TRUE) * 0.9,
+           label = "Non-responder (-)", color = "#E74C3C", hjust = 0, fontface = "bold")
+```
+
+## Stacked Bar Plot
+
+```{r stacked-bar, fig.width=10, fig.height=6}
+# Calculate proportions
+prop_data <- result@meta.data %>%
+  group_by(celltype, scPAS) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  group_by(celltype) %>%
+  mutate(proportion = count / sum(count) * 100)
+
+ggplot(prop_data, aes(x = celltype, y = proportion, fill = scPAS)) +
+  geom_bar(stat = "identity", position = "stack") +
+  scale_fill_manual(values = class_colors) +
+  coord_flip() +
+  labs(
+    x = "",
+    y = "Percentage of Cells",
+    title = "Response Classification by Cell Type",
+    fill = "Classification"
+  ) +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold")
+  )
+```
+
+# Biological Interpretation
+
+## Responder-Associated Populations (scPAS+)
+
+```{r interpretation-responder, fig.width=10, fig.height=4}
+# Top responder-associated cell types
+responder_cells <- celltype_scores %>%
+  filter(mean_NRS > 0) %>%
+  arrange(desc(mean_NRS))
+
+interpretation_resp <- data.frame(
+  CellType = responder_cells$celltype,
+  Mechanism = c(
+    "Antigen presentation",
+    "Tumor killing",
+    "Immune memory",
+    "Direct cytotoxicity",
+    "Immune activation",
+    "Antibody production"
+  )[1:nrow(responder_cells)]
+)
+
+ggplot(interpretation_resp, aes(x = reorder(CellType, seq_len(nrow(interpretation_resp))), 
+                                y = 1, fill = "#27AE60")) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = Mechanism), color = "white", fontface = "bold", size = 3.5) +
+  scale_fill_identity() +
+  coord_flip() +
+  labs(
+    x = "",
+    y = "",
+    title = "Responder-Associated Cell Types and Mechanisms"
+  ) +
+  theme(
+    axis.text.x = element_blank(),
+    axis.ticks = element_blank(),
+    panel.grid = element_blank(),
+    plot.title = element_text(hjust = 0.5, face = "bold", color = "#27AE60")
+  )
+```
+
+## Non-Responder-Associated Populations (scPAS-)
+
+```{r interpretation-nonresponder, fig.width=10, fig.height=4}
+# Top non-responder-associated cell types
+nonresponder_cells <- celltype_scores %>%
+  filter(mean_NRS < 0) %>%
+  arrange(mean_NRS)
+
+interpretation_nonresp <- data.frame(
+  CellType = nonresponder_cells$celltype,
+  Mechanism = c(
+    "Immunosuppression",
+    "T cell dysfunction",
+    "Regulatory function",
+    "Immune evasion",
+    "Inflammatory",
+    "Suppressive"
+  )[1:nrow(nonresponder_cells)]
+)
+
+ggplot(interpretation_nonresp, aes(x = reorder(CellType, seq_len(nrow(interpretation_nonresp))), 
+                                   y = 1, fill = "#E74C3C")) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = Mechanism), color = "white", fontface = "bold", size = 3.5) +
+  scale_fill_identity() +
+  coord_flip() +
+  labs(
+    x = "",
+    y = "",
+    title = "Non-Responder-Associated Cell Types and Mechanisms"
+  ) +
+  theme(
+    axis.text.x = element_blank(),
+    axis.ticks = element_blank(),
+    panel.grid = element_blank(),
+    plot.title = element_text(hjust = 0.5, face = "bold", color = "#E74C3C")
+  )
+```
+
+# Predictive Signature
+
+## Extract Response Signature
+
+```{r response-signature}
+# Get model coefficients
+coefs <- result@misc$scPAS_para$Coefs
+coefs <- coefs[coefs != 0]
+
+# Top positive (responder) genes
+top_responder_genes <- sort(coefs, decreasing = TRUE)[1:10]
+cat("Top 10 Responder-Associated Genes:\n")
+print(round(top_responder_genes, 4))
+
+# Top negative (non-responder) genes
+top_nonresponder_genes <- sort(coefs)[1:10]
+cat("\nTop 10 Non-Responder-Associated Genes:\n")
+print(round(top_nonresponder_genes, 4))
+```
+
+## Signature Visualization
+
+```{r signature-viz, fig.width=10, fig.height=6}
+# Create coefficient plot
+sig_genes <- c(head(sort(coefs, decreasing = TRUE), 15),
+               head(sort(coefs), 15))
+sig_df <- data.frame(
+  Gene = names(sig_genes),
+  Coefficient = as.numeric(sig_genes)
+)
+sig_df$Direction <- ifelse(sig_df$Coefficient > 0, "Responder", "Non-responder")
+
+ggplot(sig_df, aes(x = reorder(Gene, Coefficient), y = Coefficient, fill = Direction)) +
+  geom_bar(stat = "identity") +
+  scale_fill_manual(values = c("Responder" = "#27AE60", "Non-responder" = "#E74C3C")) +
+  coord_flip() +
+  labs(
+    x = "",
+    y = "Model Coefficient",
+    title = "Response Prediction Signature",
+    fill = "Associated with"
+  ) +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold")
+  )
+```
+
+# Publication Figure
+
+```{r publication-figure, fig.width=16, fig.height=12}
+# Comprehensive figure
+p_a <- DimPlot(result, group.by = "celltype", cols = ct_colors, label = TRUE, label.size = 2.5) +
+  ggtitle("A. Cell Types") + NoLegend()
+
+p_b <- FeaturePlot(result, features = "scPAS_NRS", pt.size = 0.5) +
+  scale_color_gradient2(low = "#E74C3C", mid = "white", high = "#27AE60", 
+                        midpoint = 0, name = "Score") +
+  ggtitle("B. Response Score")
+
+p_c <- DimPlot(result, group.by = "scPAS", cols = class_colors, pt.size = 0.5,
+               order = c("0", "scPAS-", "scPAS+")) +
+  ggtitle("C. Classification")
+
+p_d <- ggplot(celltype_scores, aes(x = reorder(celltype, mean_NRS), y = mean_NRS, 
+                                   fill = mean_NRS > 0)) +
+  geom_bar(stat = "identity") +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  scale_fill_manual(values = c("TRUE" = "#27AE60", "FALSE" = "#E74C3C")) +
+  coord_flip() +
+  labs(x = "", y = "Mean Score") +
+  ggtitle("D. Cell Type Association") +
+  theme(legend.position = "none")
+
+p_e <- VlnPlot(result, features = "scPAS_NRS", group.by = "celltype",
+               cols = ct_colors[celltype_scores$celltype], pt.size = 0) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  ggtitle("E. Score Distribution") +
+  NoLegend() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 8))
+
+p_f <- ggplot(sig_df, aes(x = reorder(Gene, Coefficient), y = Coefficient, fill = Direction)) +
+  geom_bar(stat = "identity") +
+  scale_fill_manual(values = c("Responder" = "#27AE60", "Non-responder" = "#E74C3C")) +
+  coord_flip() +
+  labs(x = "", y = "Coefficient") +
+  ggtitle("F. Signature Genes") +
+  theme(legend.position = "bottom", axis.text.y = element_text(size = 7))
+
+# Combine
+layout <- "
+AABBCC
+DDEEFF
+"
+
+p_a + p_b + p_c + p_d + p_e + p_f + 
+  plot_layout(design = layout) +
+  plot_annotation(
+    title = "scPAS Analysis: Immunotherapy Response Prediction",
+    theme = theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 16))
+  )
+```
+
+# Clinical Application
+
+## Predict Response for New Patients
+
+```{r predict-new-patients, eval=FALSE}
+# Apply model to new bulk samples
+new_predictions <- scPAS.prediction(
+  model = result,
+  test.data = new_bulk_data,
+  do_imputation = FALSE
+)
+
+# Get predicted response
+predicted_response <- new_predictions$scPAS
+table(predicted_response)
+
+# Calculate response probability
+response_prob <- pnorm(new_predictions$scPAS_NRS)
+```
+
+# Key Takeaways
+
+1. **Responder-associated cells** (scPAS+):
+   - Effector CD8+ T cells
+   - cDC1 dendritic cells
+   - Cytotoxic NK cells
+   - Memory CD8+ T cells
+
+2. **Non-responder-associated cells** (scPAS-):
+   - Regulatory T cells (Tregs)
+   - Exhausted CD8+ T cells
+   - Regulatory NK cells
+
+3. **Therapeutic implications**:
+   - Enhance effector T cell function
+   - Promote cDC1 activity
+   - Deplete or reprogram Tregs
+   - Reverse T cell exhaustion
+
+# Session Information
+
+```{r session-info}
+sessionInfo()
+```

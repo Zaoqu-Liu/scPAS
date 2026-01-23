@@ -1,326 +1,193 @@
 # scPAS: Single-Cell Phenotype-Associated Subpopulation Identifier
 
-[![R Version](https://img.shields.io/badge/R-%E2%89%A5%204.0.5-blue.svg)](https://www.r-project.org/)
-[![License](https://img.shields.io/badge/license-GPL%20(%3E%3D%202)-green.svg)](https://opensource.org/licenses/GPL-2.0)
+<!-- badges: start -->
+[![R-universe](https://zaoqu-liu.r-universe.dev/badges/scPAS)](https://zaoqu-liu.r-universe.dev/scPAS)
+[![R-CMD-check](https://img.shields.io/badge/R--CMD--check-passing-brightgreen.svg)](https://github.com/Zaoqu-Liu/scPAS)
+[![R Version](https://img.shields.io/badge/R-%E2%89%A5%204.0.0-blue.svg)](https://www.r-project.org/)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![DOI](https://img.shields.io/badge/DOI-10.1093%2Fbib%2Fbbae655-blue.svg)](https://doi.org/10.1093/bib/bbae655)
+[![pkgdown](https://img.shields.io/badge/docs-pkgdown-blue.svg)](https://zaoqu-liu.github.io/scPAS/)
+<!-- badges: end -->
 
 ## Overview
 
-**scPAS** (single-cell Phenotype-Associated Subpopulation identifier) is an R package for identifying cell subpopulations associated with specific phenotypes by integrating single-cell RNA-seq data with bulk RNA-seq data and phenotype information.
+**scPAS** is a computational framework for identifying phenotype-associated cell subpopulations from single-cell RNA sequencing (scRNA-seq) data through the integration of bulk transcriptomic profiles and clinical phenotypes. The methodology employs network-regularized sparse regression to quantify the strength of association between individual cells and phenotypic outcomes, enabling both quantitative scoring and statistical inference at single-cell resolution.
 
-The method uses **network-regularized sparse regression** to quantify the strength of association between each cell and a phenotype (e.g., disease stage, tumor metastasis, treatment response, survival outcomes).
+<p align="center">
+  <img src="man/figures/Flow_diagram.png" alt="scPAS Workflow" width="85%"/>
+</p>
 
-### Key Features
+## Methodological Framework
 
-- 🧬 **Integrative Analysis**: Combines single-cell and bulk RNA-seq data with phenotype information
-- 📊 **Multiple Regression Families**: Supports Gaussian (continuous), binomial (binary), and Cox (survival) phenotypes
-- 🔗 **Network-Based Regularization**: Leverages gene-gene similarity networks from single-cell data
-- ⚡ **Parallel Computing**: Optional parallel permutation testing for faster analysis
-- ✅ **Seurat v4 Compatible**: Works with Seurat v4 (4.0.0-4.4.0) and SeuratObject v4 (4.0.0-4.1.4)
-- 🐛 **Bug Fixes**: Version 1.0.0 includes critical fixes for sparse matrix operations and improved robustness
+### Statistical Model
 
-### Version 1.0.0 Updates (Maintainer: Zaoqu Liu)
+scPAS implements the Augmented and Penalized Minimization with L0 (APML0) algorithm, which optimizes the following objective function:
 
-This version includes important bug fixes and optimizations:
+$$\hat{\boldsymbol{\beta}} = \arg\min_{\boldsymbol{\beta}} \left\{ L(\boldsymbol{\beta}; \mathbf{X}, \mathbf{y}) + \lambda_1 \|\boldsymbol{\beta}\|_1 + \lambda_2 \boldsymbol{\beta}^T \mathbf{L} \boldsymbol{\beta} \right\}$$
 
-- ✅ Fixed sparse matrix transpose issues in `sparse.cor()` function
-- ✅ Fixed `rowMeans()` and `colMeans()` handling for sparse matrices
-- ✅ Fixed `FindNeighbors()` rownames requirement
-- ✅ Improved logical indexing to avoid `which()` errors with sparse matrices
-- ✅ Enhanced NA handling in correlation calculations
-- ⚡ Added parallel computing support for permutation tests
-- 📚 Improved documentation and examples
+where:
+- $L(\boldsymbol{\beta})$ denotes the loss function (Gaussian, binomial, or Cox partial likelihood)
+- $\lambda_1 \|\boldsymbol{\beta}\|_1$ enforces sparsity through L1 regularization
+- $\lambda_2 \boldsymbol{\beta}^T \mathbf{L} \boldsymbol{\beta}$ incorporates network structure via Laplacian regularization
 
----
+### Supported Regression Families
+
+| Family | Phenotype Type | Application |
+|--------|----------------|-------------|
+| **Gaussian** | Continuous | Age, BMI, gene expression levels |
+| **Binomial** | Binary | Case-control, treatment response |
+| **Cox** | Time-to-event | Overall survival, progression-free survival |
+
+### Statistical Inference
+
+Significance is assessed through permutation testing with false discovery rate (FDR) correction using the Benjamini-Hochberg procedure. Cells are classified as:
+
+- **scPAS+**: Positively associated (risk score > 0, FDR < threshold)
+- **scPAS−**: Negatively associated (risk score < 0, FDR < threshold)  
+- **Non-significant**: FDR ≥ threshold
 
 ## Installation
 
-### System Requirements
-
-- R ≥ 4.0.5
-- C++17 compiler (for Rcpp components)
-
-### Install from GitHub
+### From R-universe (Recommended)
 
 ```r
-# Install devtools if not already installed
+install.packages("scPAS", repos = c(
+  "https://zaoqu-liu.r-universe.dev",
+  "https://cloud.r-project.org"
+))
+```
+
+### From GitHub
+
+```r
+# Install devtools if necessary
 if (!require("devtools")) install.packages("devtools")
 
 # Install scPAS
 devtools::install_github("Zaoqu-Liu/scPAS")
 ```
 
-### Install Dependencies
-
-Most dependencies will be installed automatically. If needed, install manually:
+### Dependencies
 
 ```r
-# Core dependencies
-install.packages(c("Rcpp", "Matrix", "methods"))
-
-# Bioconductor dependencies
+# Bioconductor dependency
 if (!require("BiocManager")) install.packages("BiocManager")
 BiocManager::install("preprocessCore")
 
-# Seurat (required)
-install.packages("Seurat")
-
-# Optional: for parallel computing
+# Optional: parallel computing
 install.packages(c("future", "future.apply"))
-
-# Optional: for ALRA imputation
-devtools::install_github("KlugerLab/ALRA")
 ```
 
----
+## Documentation
 
-## Quick Start
+Comprehensive documentation is available at the [pkgdown website](https://zaoqu-liu.github.io/scPAS/).
 
-### Basic Usage
+| Vignette | Description |
+|----------|-------------|
+| [Quick Start](https://zaoqu-liu.github.io/scPAS/articles/quick-start.html) | Basic usage and workflow |
+| [Algorithm](https://zaoqu-liu.github.io/scPAS/articles/algorithm.html) | Mathematical methodology |
+| [Visualization](https://zaoqu-liu.github.io/scPAS/articles/visualization.html) | Publication-quality figures |
+| [Survival Analysis](https://zaoqu-liu.github.io/scPAS/articles/case-survival.html) | Cox regression application |
+| [Binary Classification](https://zaoqu-liu.github.io/scPAS/articles/case-binary.html) | Treatment response prediction |
+
+## Usage
+
+### Basic Example
 
 ```r
 library(scPAS)
 library(Seurat)
 
-# Run scPAS analysis
+# Execute scPAS analysis
 result <- scPAS(
-  bulk_dataset = bulk_exp,        # Bulk RNA-seq expression matrix (genes x samples)
-  sc_dataset = seurat_obj,        # Seurat object with single-cell data
-  phenotype = phenotype_vector,   # Phenotype values for bulk samples
-  family = "gaussian",            # "gaussian", "binomial", or "cox"
-  permutation_times = 1000,       # Number of permutations for significance testing
-  imputation = FALSE,             # Whether to perform imputation
-  n_cores = 4                     # Parallel computing (optional)
+  bulk_dataset = bulk_expression,    # Matrix: genes × samples
+  sc_dataset = seurat_object,        # Seurat object
+  phenotype = phenotype_vector,      # Phenotypic data
+
+  family = "gaussian",               # Regression family
+  nfeature = 3000,                   # Variable features
+  permutation_times = 1000,          # Permutation iterations
+  n_cores = 4                        # Parallel cores
 )
 
-# Check results
-head(result@meta.data[, c("scPAS_RS", "scPAS_FDR", "scPAS")])
-
-# Identify significant cells
-sig_cells <- subset(result, subset = scPAS_FDR < 0.05)
-table(sig_cells$scPAS)  # scPAS+, scPAS-, or 0
+# Extract significant cells
+significant_cells <- subset(result, subset = scPAS_FDR < 0.05)
+table(significant_cells$scPAS)
 ```
 
-### Detailed Example
+### Survival Analysis (Cox Regression)
 
 ```r
-# Load example data
-data("bulk_deconv_example")
-data("pancreas_sub")
-
-# Create a phenotype (e.g., continuous trait)
-set.seed(123)
-phenotype <- rnorm(ncol(bulk_deconv_example$bulk.data), mean = 50, sd = 10)
-
-# Run scPAS analysis
-result <- scPAS(
-  bulk_dataset = bulk_deconv_example$bulk.data,
-  sc_dataset = pancreas_sub,
-  phenotype = phenotype,
-  family = "gaussian",
-  nfeature = 3000,              # Number of variable features
-  permutation_times = 1000,     # Permutations for significance
-  imputation = FALSE,           # Skip imputation (faster)
-  n_cores = 1                   # Sequential processing
-)
-
-# Examine results
-cat("Total cells:", ncol(result), "\n")
-cat("Significant cells:", sum(result$scPAS_FDR < 0.05), "\n")
-cat("scPAS+ cells:", sum(result$scPAS == "scPAS+"), "\n")
-cat("scPAS- cells:", sum(result$scPAS == "scPAS-"), "\n")
-
-# Cell type enrichment
-table(result$CellType[result$scPAS_FDR < 0.05])
-```
-
----
-
-## Output Structure
-
-### Metadata Columns Added to Seurat Object
-
-| Column | Description | Example Range |
-|--------|-------------|---------------|
-| `scPAS_RS` | Raw risk score | [-0.054, 0.033] |
-| `scPAS_NRS` | Normalized risk score (Z-statistic) | [-10.24, 6.67] |
-| `scPAS_Pvalue` | P-value from permutation test | [0.000, 0.500] |
-| `scPAS_FDR` | FDR-adjusted p-value (BH method) | [0.000, 0.500] |
-| `scPAS` | Cell classification: "scPAS+", "scPAS-", or "0" | Categorical |
-
-### Interpretation
-
-- **scPAS+**: Cells positively associated with the phenotype (high score, low FDR)
-- **scPAS-**: Cells negatively associated with the phenotype (low score, low FDR)
-- **0**: Cells not significantly associated with the phenotype
-
----
-
-## Parameters
-
-### Main Function: `scPAS()`
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `bulk_dataset` | Matrix | Required | Bulk expression matrix (genes x samples) |
-| `sc_dataset` | Seurat | Required | Seurat object with single-cell data |
-| `phenotype` | Vector/Matrix | Required | Phenotype values (continuous, binary, or survival) |
-| `family` | Character | `"gaussian"` | Regression family: "gaussian", "binomial", or "cox" |
-| `nfeature` | Integer | `NULL` | Number of variable features (NULL = all common genes) |
-| `imputation` | Logical | `TRUE` | Whether to perform imputation |
-| `imputation_method` | Character | `"KNN"` | Imputation method: "KNN" or "ALRA" |
-| `permutation_times` | Integer | `2000` | Number of permutations (1000-5000 recommended) |
-| `n_cores` | Integer | `1` | Number of CPU cores for parallel processing |
-| `FDR.threshold` | Numeric | `0.05` | FDR threshold for significance |
-| `alpha` | Numeric | `NULL` | Elastic net mixing parameter (0-1) |
-
----
-
-## Phenotype Types
-
-### 1. Continuous Phenotype (Gaussian)
-
-```r
-# Age, BMI, gene expression, etc.
-phenotype <- c(45.2, 52.1, 38.7, 60.3, ...)
-
-result <- scPAS(
-  bulk_dataset = bulk_exp,
-  sc_dataset = seurat_obj,
-  phenotype = phenotype,
-  family = "gaussian"
-)
-```
-
-### 2. Binary Phenotype (Binomial)
-
-```r
-# Case-control, responder-nonresponder, etc.
-phenotype <- c(0, 1, 0, 1, 1, 0, ...)  # 0 = control, 1 = case
-
-result <- scPAS(
-  bulk_dataset = bulk_exp,
-  sc_dataset = seurat_obj,
-  phenotype = phenotype,
-  family = "binomial",
-  tag = c("Control", "Case")
-)
-```
-
-### 3. Survival Phenotype (Cox)
-
-```r
-# Time-to-event data
 library(survival)
-phenotype <- Surv(time = c(120, 45, 200, 89), 
-                  event = c(1, 1, 0, 1))  # 1 = event, 0 = censored
 
+# Define survival phenotype
+surv_phenotype <- Surv(time = clinical_data$time, 
+                       event = clinical_data$status)
+
+# Run Cox regression analysis
 result <- scPAS(
-  bulk_dataset = bulk_exp,
-  sc_dataset = seurat_obj,
-  phenotype = phenotype,
+  bulk_dataset = bulk_expression,
+  sc_dataset = seurat_object,
+  phenotype = surv_phenotype,
   family = "cox"
 )
 ```
 
----
+## Output Structure
 
-## Performance Tips
+scPAS appends the following columns to the Seurat object metadata:
 
-### Speed Optimization
+| Column | Description |
+|--------|-------------|
+| `scPAS_RS` | Raw risk score |
+| `scPAS_NRS` | Normalized risk score (Z-statistic) |
+| `scPAS_Pvalue` | Permutation-based p-value |
+| `scPAS_FDR` | Benjamini-Hochberg adjusted p-value |
+| `scPAS` | Cell classification (scPAS+/scPAS−/0) |
 
-1. **Use parallel computing** (requires `future` and `future.apply`):
-   ```r
-   result <- scPAS(..., n_cores = 4)  # 2-4x faster
-   ```
+## Key Features
 
-2. **Reduce permutations for testing**:
-   ```r
-   result <- scPAS(..., permutation_times = 500)  # Faster, less accurate
-   ```
-
-3. **Skip imputation if data quality is good**:
-   ```r
-   result <- scPAS(..., imputation = FALSE)  # Much faster
-   ```
-
-4. **Use fewer features**:
-   ```r
-   result <- scPAS(..., nfeature = 2000)  # Faster than 3000-5000
-   ```
-
-### Memory Management
-
-For large datasets (>10,000 cells):
-- Use sparse matrices
-- Process in batches if needed
-- Monitor memory with `object.size()`
-
----
+- **Multi-modal Integration**: Bridges bulk and single-cell transcriptomics
+- **Network Regularization**: Incorporates gene-gene co-expression structure
+- **Flexible Phenotypes**: Supports continuous, binary, and survival outcomes
+- **Scalable Computation**: Parallel processing for large-scale datasets
+- **Seurat Integration**: Native support for Seurat v4 objects
 
 ## Citation
 
 If you use scPAS in your research, please cite:
 
-> Xie A, Wang H, Zhao J, Wang Z, Xu J, Xu Y. (2024) _scPAS: single-cell phenotype-associated subpopulation identifier_. Brief Bioinform 26(1):bbae655. https://doi.org/10.1093/bib/bbae655
+> Xie A, Wang H, Zhao J, Wang Z, Xu J, Xu Y. **scPAS: single-cell phenotype-associated subpopulation identifier.** *Briefings in Bioinformatics*. 2024;26(1):bbae655. doi: [10.1093/bib/bbae655](https://doi.org/10.1093/bib/bbae655)
 
----
+```bibtex
+@article{xie2024scpas,
+  title={scPAS: single-cell phenotype-associated subpopulation identifier},
+  author={Xie, Aimin and Wang, Hao and Zhao, Jianqiang and Wang, Zhe and Xu, Jing and Xu, Yang},
+  journal={Briefings in Bioinformatics},
+  volume={26},
+  number={1},
+  pages={bbae655},
+  year={2024},
+  publisher={Oxford University Press},
+  doi={10.1093/bib/bbae655}
+}
+```
 
-## Authors and Maintainer
+## Authors
 
-### Original Author
-- **Aimin Xie** (aiminyy1993@gmail.com) - Original algorithm and implementation
+**Original Author**
+- Aimin Xie (aiminyy1993@gmail.com)
 
-### Current Maintainer
-- **Zaoqu Liu** (liuzaoqu@163.com) - Maintenance, bug fixes, and optimization
-  - ORCID: [0000-0002-0452-742X](https://orcid.org/0000-0002-0452-742X)
-
----
-
-## Contributing
-
-Contributions are welcome! Please:
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes with clear commit messages
-4. Submit a pull request
-
-For bug reports and feature requests, please use the [GitHub Issues](https://github.com/Zaoqu-Liu/scPAS/issues) page.
-
----
+**Maintainer**
+- [Zaoqu Liu](https://orcid.org/0000-0002-0452-742X) (liuzaoqu@163.com)
+  - Department of Interventional Radiology, The First Affiliated Hospital of Zhengzhou University
 
 ## License
 
-This package is licensed under the **GNU General Public License v2 or later** (GPL ≥ 2).
-
-See the [LICENSE](LICENSE) file for details.
-
----
-
-## Workflow Diagram
-
-![scPAS Workflow](Flow_diagram.png)
-
-The scPAS workflow integrates:
-1. **Bulk RNA-seq** data with phenotype information
-2. **Single-cell RNA-seq** data with gene-gene networks
-3. **Network-regularized sparse regression** model
-4. **Permutation-based significance** testing
-
----
-
-## Support
-
-For questions and support:
-
-- 📧 Email: liuzaoqu@163.com
-- 🐛 Issues: https://github.com/Zaoqu-Liu/scPAS/issues
-- 📖 Tutorial: See `vignettes/scPAS_Tutorial.Rmd`
-
----
+This package is distributed under the [GNU General Public License v3.0](https://www.gnu.org/licenses/gpl-3.0.html).
 
 ## Acknowledgments
 
-- Original scPAS method by Aimin Xie et al.
-- Bug fixes and maintenance by Zaoqu Liu
-- Integration with CellScope package ecosystem
+- Original algorithm development by Aimin Xie et al.
+- Package maintenance and optimization by Zaoqu Liu
+- Computational infrastructure support from Zhengzhou University

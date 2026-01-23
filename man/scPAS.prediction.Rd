@@ -9,20 +9,34 @@ scPAS.prediction(
   test.data,
   assay = "RNA",
   FDR.threshold = 0.05,
-  imputation = F,
+  do_imputation = FALSE,
   imputation_method = "KNN",
-  independent = T
+  independent = TRUE,
+  permutation_times = 2000,
+  n_cores = 1
 )
 }
 \arguments{
-\item{model}{seurat object. A seurat object containing the scPAS model}
+\item{model}{Seurat object. A Seurat object containing the scPAS model (from running scPAS()).}
 
-\item{test.data}{Matrix or seurat object. Single-cell RNA-seq expression matrix of related disease. Each row represents a gene and each column represents a sample. A Seurat object that contains the preprocessed data and constructed network is preferred.}
+\item{test.data}{Matrix or Seurat object. Single-cell RNA-seq expression matrix of related disease. 
+  Each row represents a gene and each column represents a sample. A Seurat object that contains 
+  the preprocessed data and constructed network is preferred.}
 
 \item{assay}{Name of Assay to get.}
 
 \item{FDR.threshold}{Numeric. FDR value threshold for identifying phenotype-associated cells.
-The default is 0.05.}
+  The default is 0.05.}
+
+\item{do_imputation}{Logical. Whether to perform imputation on the test data (default: FALSE).}
+
+\item{imputation_method}{Character. Imputation method: "KNN" or "ALRA".}
+
+\item{independent}{Logical. Whether to compute background distribution independently for each cell.}
+
+\item{permutation_times}{Integer. Number of permutations for significance testing (default: 2000).}
+
+\item{n_cores}{Integer. Number of CPU cores for parallel processing (default: 1).}
 }
 \value{
 A seurat object or data frame containing the forecast results.

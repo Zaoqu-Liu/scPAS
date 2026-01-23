@@ -1,0 +1,251 @@
+---
+title: "Quick Start Guide"
+author: 
+  - name: "Zaoqu Liu"
+    email: "liuzaoqu@163.com"
+    affiliation: "Department of Interventional Radiology, The First Affiliated Hospital of Zhengzhou University"
+    orcid: "0000-0002-0452-742X"
+  - name: "Aimin Xie"
+    email: "aiminyy1993@gmail.com"
+    affiliation: "Original Author"
+date: "`r Sys.Date()`"
+output: 
+  rmarkdown::html_vignette:
+    toc: true
+    toc_depth: 3
+    number_sections: true
+vignette: >
+  %\VignetteIndexEntry{Quick Start Guide}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 7,
+  fig.height = 5,
+  warning = FALSE,
+  message = FALSE
+)
+```
+
+# Introduction
+
+**scPAS** (Single-Cell Phenotype-Associated Subpopulation identifier) is a computational tool designed to identify cell subpopulations associated with phenotypes by integrating single-cell RNA-seq data with bulk transcriptomics data.
+
+## Key Features
+
+- **Multi-modal Integration**: Combines single-cell and bulk RNA-seq data
+- **Multiple Phenotype Types**: Supports continuous, binary, and survival phenotypes
+- **Network Regularization**: Leverages gene-gene similarity networks
+- **Statistical Rigor**: Permutation-based significance testing with FDR correction
+
+## Package Installation
+
+```{r install, eval=FALSE}
+# Install from GitHub
+if (!require("devtools")) install.packages("devtools")
+devtools::install_github("Zaoqu-Liu/scPAS")
+
+# Install dependencies if needed
+if (!require("BiocManager")) install.packages("BiocManager")
+BiocManager::install("preprocessCore")
+```
+
+# Quick Example
+
+## Load Required Packages
+
+```{r load-packages}
+library(scPAS)
+library(Matrix)
+library(Seurat)
+```
+
+## Simulate Example Data
+
+For this quick start, we'll create simulated data to demonstrate the workflow:
+
+```{r simulate-data}
+set.seed(42)
+
+# Simulate bulk RNA-seq data (500 genes x 50 samples)
+n_genes <- 500
+n_bulk_samples <- 50
+n_cells <- 200
+
+bulk_data <- matrix(
+  rpois(n_genes * n_bulk_samples, lambda = 100),
+  nrow = n_genes,
+  ncol = n_bulk_samples
+)
+rownames(bulk_data) <- paste0("Gene", 1:n_genes)
+colnames(bulk_data) <- paste0("Sample", 1:n_bulk_samples)
+
+# Add log transformation
+bulk_data <- log2(bulk_data + 1)
+
+# Simulate single-cell data (same genes x 200 cells)
+sc_counts <- matrix(
+  rpois(n_genes * n_cells, lambda = 5),
+  nrow = n_genes,
+  ncol = n_cells
+)
+rownames(sc_counts) <- paste0("Gene", 1:n_genes)
+colnames(sc_counts) <- paste0("Cell", 1:n_cells)
+
+# Create Seurat object
+sc_obj <- CreateSeuratObject(
+  counts = sc_counts,
+  project = "QuickStart"
+)
+
+# Add cell type labels
+sc_obj$celltype <- sample(
+  c("TypeA", "TypeB", "TypeC"),
+  n_cells,
+  replace = TRUE
+)
+
+# Simulate phenotype (continuous)
+phenotype <- rnorm(n_bulk_samples, mean = 50, sd = 10)
+names(phenotype) <- colnames(bulk_data)
+```
+
+## Preprocess Single-Cell Data
+
+Use the built-in `run_Seurat()` function for standard preprocessing:
+
+```{r preprocess}
+# Standard Seurat preprocessing
+sc_obj <- run_Seurat(sc_obj, verbose = FALSE)
+
+# Check the result
+sc_obj
+```
+
+## Run scPAS Analysis
+
+```{r run-scpas}
+# Run scPAS with Gaussian family (continuous phenotype)
+result <- scPAS(
+  bulk_dataset = bulk_data,
+  sc_dataset = sc_obj,
+  phenotype = phenotype,
+  family = "gaussian",
+  nfeature = 200,           # Use top 200 variable genes
+  permutation_times = 100,  # Reduced for demo (use 1000+ in practice)
+  do_imputation = FALSE,    # Skip imputation for speed
+  n_cores = 1               # Single core
+)
+```
+
+## Examine Results
+
+```{r examine-results}
+# View added metadata columns
+head(result@meta.data[, c("scPAS_RS", "scPAS_NRS", "scPAS_Pvalue", "scPAS_FDR", "scPAS")])
+
+# Summary of cell classifications
+table(result$scPAS)
+
+# Check significance
+cat("Cells with FDR < 0.05:", sum(result$scPAS_FDR < 0.05, na.rm = TRUE), "\n")
+cat("scPAS+ cells:", sum(result$scPAS == "scPAS+", na.rm = TRUE), "\n")
+cat("scPAS- cells:", sum(result$scPAS == "scPAS-", na.rm = TRUE), "\n")
+```
+
+## Basic Visualization
+
+```{r basic-viz, fig.width=10, fig.height=4}
+library(ggplot2)
+
+# UMAP plot colored by cell type
+p1 <- DimPlot(result, group.by = "celltype", label = TRUE) +
+  ggtitle("Cell Types") +
+  theme(legend.position = "bottom")
+
+# UMAP plot colored by risk score
+p2 <- FeaturePlot(result, features = "scPAS_NRS") +
+  scale_color_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0) +
+  ggtitle("Normalized Risk Score")
+
+# Combine plots
+p1 | p2
+```
+
+# Output Structure
+
+The scPAS function adds the following columns to the Seurat object's metadata:
+
+| Column | Description |
+|--------|-------------|
+| `scPAS_RS` | Raw risk score |
+| `scPAS_NRS` | Normalized risk score (Z-statistic) |
+| `scPAS_Pvalue` | P-value from permutation test |
+| `scPAS_FDR` | FDR-adjusted p-value |
+| `scPAS` | Classification: "scPAS+", "scPAS-", or "0" |
+
+# Three Phenotype Types
+
+## 1. Continuous Phenotype (Gaussian)
+
+For continuous outcomes like age, BMI, gene expression levels:
+
+```{r gaussian-example, eval=FALSE}
+result <- scPAS(
+  bulk_dataset = bulk_data,
+  sc_dataset = sc_obj,
+  phenotype = continuous_values,
+  family = "gaussian"
+)
+```
+
+## 2. Binary Phenotype (Binomial)
+
+For case-control, responder/non-responder comparisons:
+  
+```{r binomial-example, eval=FALSE}
+# Binary phenotype (0/1)
+binary_phenotype <- c(0, 1, 0, 1, 1, ...)
+
+result <- scPAS(
+  bulk_dataset = bulk_data,
+  sc_dataset = sc_obj,
+  phenotype = binary_phenotype,
+  family = "binomial",
+  tag = c("Control", "Case")  # Labels for 0 and 1
+)
+```
+
+## 3. Survival Phenotype (Cox)
+
+For time-to-event data:
+
+```{r cox-example, eval=FALSE}
+# Create survival object
+library(survival)
+surv_phenotype <- Surv(time = survival_times, event = event_status)
+
+result <- scPAS(
+  bulk_dataset = bulk_data,
+  sc_dataset = sc_obj,
+  phenotype = surv_phenotype,
+  family = "cox"
+)
+```
+
+# Next Steps
+
+- **Algorithm Details**: See `vignette("algorithm")` for methodology
+- **Visualization**: See `vignette("visualization")` for advanced plots
+- **Case Studies**: See `vignette("case-survival")` for real-world examples
+- **Full Tutorial**: See `vignette("scPAS_Tutorial")` for comprehensive guide
+
+# Session Information
+
+```{r session-info}
+sessionInfo()
+```

@@ -16,12 +16,13 @@ vignette: >
 
 ```{r setup, include = FALSE}
 knitr::opts_chunk$set(
-	collapse = TRUE,
-	comment = "#>",
-	root.dir = "./",
-	knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
+  collapse = TRUE,
+  comment = "#>",
+  root.dir = "./",
+  warning = FALSE, 
+  message = FALSE,
+  eval = FALSE  # Set to TRUE if you have the data files
 )
-#knitr::opts_chunk$set(eval = FALSE)
 ```
 
 
@@ -64,8 +65,9 @@ In this example, we used TCGA-LIHC bulk samples with survival information to ide
 
 The data used in this tutorial is stored at: <https://drive.google.com/drive/folders/1Qgdx7YWSkJJ-ZjYHFt9tD33ZC85vQk8o?usp=sharing>
 
-```{r paged.print=FALSE}
-load(file = '../data/data_survival.rda')
+```{r paged.print=FALSE, eval=FALSE}
+# Data available at: https://drive.google.com/drive/folders/1Qgdx7YWSkJJ-ZjYHFt9tD33ZC85vQk8o
+load(file = 'data_survival.rda')
 dim(sc_dataset)
 
 head(bulk_dataset[,1:10])
@@ -121,7 +123,7 @@ all(rownames(phenotype)==colnames(bulk_dataset))
 
 -   The input provided above is survival data; therefore, scPAS needs to fit a Cox regression model (family = 'cox').
 
--   imputation = F , without imputation.
+-   do_imputation = FALSE , without imputation.
 
 -   nfeature = 3000 indicates that the top 3000 highly variable genes are selected for model training.
 
@@ -130,7 +132,7 @@ all(rownames(phenotype)==colnames(bulk_dataset))
 ```{r warning=FALSE}
 time.start <- Sys.time()
 
-sc_dataset <- scPAS(bulk_dataset = bulk_dataset,sc_dataset = sc_dataset,assay = 'RNA',phenotype = phenotype,imputation = F, nfeature = 3000,alpha = 0.01,network_class = 'SC',family = 'cox')
+sc_dataset <- scPAS(bulk_dataset = bulk_dataset,sc_dataset = sc_dataset,assay = 'RNA',phenotype = phenotype,do_imputation = FALSE, nfeature = 3000,alpha = 0.01,network_class = 'SC',family = 'cox')
 time.end <- Sys.time()
 
 time.end-time.start
@@ -158,12 +160,12 @@ UMAP_celltype | UMAP_RS | UMAP_scPAS
 
 ### Run scPAS with imputation
 
-imputation = T , implement single-cell data imputation using the default KNN method.
+do_imputation = TRUE , implement single-cell data imputation using the default KNN method.
 
 ```{r warning=FALSE}
 time.start <- Sys.time()
 
-sc_dataset <- scPAS(bulk_dataset = bulk_dataset,sc_dataset = sc_dataset,assay = 'RNA',phenotype = phenotype,imputation = T, nfeature = 3000,alpha = 0.01,network_class = 'SC',family = 'cox')
+sc_dataset <- scPAS(bulk_dataset = bulk_dataset,sc_dataset = sc_dataset,assay = 'RNA',phenotype = phenotype,do_imputation = TRUE, nfeature = 3000,alpha = 0.01,network_class = 'SC',family = 'cox')
 time.end <- Sys.time()
 
 time.end-time.start
@@ -259,7 +261,7 @@ SP1 | SP2
 Directly applying the trained model to spatial transcriptomics data can reveal the spatial localization of prognostic-related cells
 
 ```{r fig.height=3.5, fig.width=12, message=FALSE, warning=FALSE, paged.print=FALSE}
-ST_data <- scPAS.prediction(model = sc_dataset,test.data = ST_data,assay = 'Spatial',imputation = T,independent = T)
+ST_data <- scPAS.prediction(model = sc_dataset,test.data = ST_data,assay = 'Spatial',do_imputation = TRUE,independent = TRUE)
 head(ST_data)
 ```
 

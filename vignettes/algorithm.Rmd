@@ -1,0 +1,406 @@
+---
+title: "Algorithm and Methodology"
+author: 
+  - name: "Zaoqu Liu"
+    email: "liuzaoqu@163.com"
+    affiliation: "Department of Interventional Radiology, The First Affiliated Hospital of Zhengzhou University"
+    orcid: "0000-0002-0452-742X"
+  - name: "Aimin Xie"
+    email: "aiminyy1993@gmail.com"
+    affiliation: "Original Author"
+date: "`r Sys.Date()`"
+output: 
+  rmarkdown::html_vignette:
+    toc: true
+    toc_depth: 3
+    number_sections: true
+vignette: >
+  %\VignetteIndexEntry{Algorithm and Methodology}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 7,
+  fig.height = 5,
+  warning = FALSE,
+  message = FALSE
+)
+```
+
+# Overview
+
+scPAS identifies phenotype-associated cell subpopulations through a multi-step computational pipeline that integrates bulk and single-cell RNA-seq data.
+
+```{r workflow-diagram, echo=FALSE, fig.cap="scPAS Workflow Overview", fig.width=8, fig.height=6}
+library(ggplot2)
+
+# Create a simple workflow diagram
+workflow_data <- data.frame(
+  step = factor(c("1. Input Data", "2. Preprocessing", "3. Network Construction", 
+                  "4. Model Training", "5. Risk Scoring", "6. Significance Testing"),
+                levels = c("1. Input Data", "2. Preprocessing", "3. Network Construction", 
+                          "4. Model Training", "5. Risk Scoring", "6. Significance Testing")),
+  y = 6:1,
+  description = c(
+    "Bulk RNA-seq + Phenotype + scRNA-seq",
+    "Quantile normalization + Variable genes",
+    "Gene-gene similarity network (SNN)",
+    "Network-regularized sparse regression",
+    "Risk score calculation per cell",
+    "Permutation test + FDR correction"
+  )
+)
+
+ggplot(workflow_data, aes(x = 1, y = y)) +
+  geom_tile(aes(fill = step), width = 0.8, height = 0.8, alpha = 0.8) +
+  geom_text(aes(label = step), fontface = "bold", size = 4, hjust = 0.5, vjust = -0.5) +
+  geom_text(aes(label = description), size = 3, hjust = 0.5, vjust = 1.5, color = "gray30") +
+  scale_fill_brewer(palette = "Blues") +
+  theme_void() +
+  theme(legend.position = "none") +
+  coord_cartesian(xlim = c(0.3, 1.7))
+```
+
+# Mathematical Framework
+
+## Problem Formulation
+
+Given:
+
+- **Bulk expression matrix** $\mathbf{X} \in \mathbb{R}^{n \times p}$ (n samples × p genes)
+- **Phenotype vector** $\mathbf{y}$ (continuous, binary, or survival)
+- **Single-cell expression matrix** $\mathbf{S} \in \mathbb{R}^{m \times p}$ (m cells × p genes)
+
+The goal is to find gene weights $\boldsymbol{\beta}$ that associate gene expression with phenotype, then apply these weights to single-cell data to compute per-cell risk scores.
+
+## Network-Regularized Sparse Regression
+
+scPAS uses the **APML0** (Augmented and Penalized Minimization L0) algorithm with network regularization:
+
+$$
+\hat{\boldsymbol{\beta}} = \arg\min_{\boldsymbol{\beta}} \left\{ L(\boldsymbol{\beta}; \mathbf{X}, \mathbf{y}) + \lambda_1 \|\boldsymbol{\beta}\|_1 + \lambda_2 \boldsymbol{\beta}^T \mathbf{L} \boldsymbol{\beta} \right\}
+$$
+
+Where:
+
+- $L(\boldsymbol{\beta})$ is the loss function (depends on phenotype type)
+- $\lambda_1 \|\boldsymbol{\beta}\|_1$ is the L1 penalty (LASSO) for sparsity
+- $\lambda_2 \boldsymbol{\beta}^T \mathbf{L} \boldsymbol{\beta}$ is the Laplacian penalty for network regularization
+- $\mathbf{L}$ is the Laplacian matrix of the gene-gene network
+
+```{r penalty-illustration, echo=FALSE, fig.cap="Effect of Network Regularization", fig.width=8, fig.height=4}
+set.seed(123)
+
+# Illustrate different penalty effects
+x_seq <- seq(-3, 3, length.out = 100)
+
+penalties <- data.frame(
+  x = rep(x_seq, 3),
+  penalty = c(
+    abs(x_seq),                    # L1
+    x_seq^2,                       # L2
+    abs(x_seq) + 0.3 * x_seq^2     # Elastic Net
+  ),
+  type = rep(c("L1 (LASSO)", "L2 (Ridge)", "Elastic Net"), each = 100)
+)
+
+ggplot(penalties, aes(x = x, y = penalty, color = type)) +
+  geom_line(size = 1.2) +
+  labs(
+    x = expression(beta),
+    y = "Penalty",
+    title = "Penalty Functions in Regularized Regression",
+    color = "Penalty Type"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "bottom",
+    plot.title = element_text(hjust = 0.5, face = "bold")
+  ) +
+  scale_color_brewer(palette = "Set1")
+```
+
+## Loss Functions by Phenotype Type
+
+### Gaussian Family (Continuous)
+
+For continuous phenotypes, we minimize the squared error:
+
+$$
+L(\boldsymbol{\beta}) = \frac{1}{2n} \sum_{i=1}^{n} (y_i - \mathbf{x}_i^T \boldsymbol{\beta})^2
+$$
+
+### Binomial Family (Binary)
+
+For binary outcomes, we use logistic regression:
+
+$$
+L(\boldsymbol{\beta}) = -\frac{1}{n} \sum_{i=1}^{n} \left[ y_i \log(p_i) + (1-y_i) \log(1-p_i) \right]
+$$
+
+where $p_i = \frac{1}{1 + e^{-\mathbf{x}_i^T \boldsymbol{\beta}}}$
+
+### Cox Family (Survival)
+
+For time-to-event data, we minimize the negative partial log-likelihood:
+
+$$
+L(\boldsymbol{\beta}) = -\frac{1}{n} \sum_{i: \delta_i = 1} \left[ \mathbf{x}_i^T \boldsymbol{\beta} - \log \sum_{j \in R(t_i)} e^{\mathbf{x}_j^T \boldsymbol{\beta}} \right]
+$$
+
+where $R(t_i)$ is the risk set at time $t_i$ and $\delta_i$ is the event indicator.
+
+# Gene Network Construction
+
+## Shared Nearest Neighbor (SNN) Network
+
+scPAS constructs a gene-gene similarity network from single-cell data using the SNN algorithm:
+
+```{r snn-algorithm, echo=FALSE, fig.cap="SNN Network Construction", fig.width=7, fig.height=5}
+set.seed(42)
+library(Matrix)
+
+# Simulate gene correlations
+n_genes <- 50
+cor_matrix <- matrix(runif(n_genes^2, -0.3, 0.8), n_genes, n_genes)
+cor_matrix <- (cor_matrix + t(cor_matrix)) / 2
+diag(cor_matrix) <- 1
+
+# Threshold to create adjacency
+adj_matrix <- cor_matrix
+adj_matrix[adj_matrix < 0.5] <- 0
+adj_matrix[adj_matrix >= 0.5] <- 1
+diag(adj_matrix) <- 0
+
+# Visualize
+image(
+  1:n_genes, 1:n_genes, adj_matrix,
+  col = c("white", "steelblue"),
+  xlab = "Gene Index", ylab = "Gene Index",
+  main = "Gene-Gene Network Adjacency Matrix"
+)
+```
+
+The network construction process:
+
+1. **Calculate gene correlations** from single-cell expression
+2. **Find k-nearest neighbors** for each gene
+3. **Compute SNN similarity** based on shared neighbors
+4. **Threshold** to create binary adjacency matrix
+
+# Risk Score Calculation
+
+## Per-Cell Risk Score
+
+Once the model is trained, the risk score for each cell is computed as:
+
+$$
+RS_j = \sum_{g=1}^{p} \hat{\beta}_g \cdot \tilde{S}_{jg}
+$$
+
+where:
+
+- $RS_j$ is the risk score for cell $j$
+- $\hat{\beta}_g$ is the learned coefficient for gene $g$
+- $\tilde{S}_{jg}$ is the standardized expression of gene $g$ in cell $j$
+
+```{r risk-score-illustration, echo=FALSE, fig.cap="Risk Score Distribution", fig.width=7, fig.height=4}
+set.seed(42)
+
+# Simulate risk scores
+n_cells <- 500
+risk_scores <- c(
+  rnorm(150, mean = -1.5, sd = 0.8),   # Low risk (scPAS-)
+  rnorm(200, mean = 0, sd = 0.6),       # Neutral
+  rnorm(150, mean = 1.5, sd = 0.8)      # High risk (scPAS+)
+)
+
+risk_df <- data.frame(
+  score = risk_scores,
+  category = factor(
+    c(rep("scPAS-", 150), rep("Neutral", 200), rep("scPAS+", 150)),
+    levels = c("scPAS-", "Neutral", "scPAS+")
+  )
+)
+
+ggplot(risk_df, aes(x = score, fill = category)) +
+  geom_histogram(bins = 40, alpha = 0.7, position = "identity") +
+  scale_fill_manual(values = c("scPAS-" = "royalblue", "Neutral" = "gray70", "scPAS+" = "indianred")) +
+  labs(
+    x = "Normalized Risk Score",
+    y = "Cell Count",
+    title = "Distribution of Cell Risk Scores",
+    fill = "Classification"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "bottom",
+    plot.title = element_text(hjust = 0.5, face = "bold")
+  ) +
+  geom_vline(xintercept = c(-1.96, 1.96), linetype = "dashed", color = "gray40")
+```
+
+## Normalized Risk Score
+
+The raw risk score is converted to a Z-statistic:
+
+$$
+NRS_j = \frac{RS_j - \mu_{bg}}{\sigma_{bg}}
+$$
+
+where $\mu_{bg}$ and $\sigma_{bg}$ are the mean and standard deviation of the background distribution estimated from permutation.
+
+# Statistical Significance Testing
+
+## Permutation Test
+
+To assess significance, scPAS performs a permutation test:
+
+```{r permutation-illustration, echo=FALSE, fig.cap="Permutation Test Principle", fig.width=8, fig.height=4}
+set.seed(42)
+
+# Simulate observed vs permuted
+observed <- 2.5
+permuted <- rnorm(1000, mean = 0, sd = 1)
+
+perm_df <- data.frame(value = permuted)
+
+p_value <- mean(abs(permuted) >= abs(observed))
+
+ggplot(perm_df, aes(x = value)) +
+  geom_histogram(bins = 50, fill = "gray70", color = "white", alpha = 0.8) +
+  geom_vline(xintercept = observed, color = "red", size = 1.5, linetype = "solid") +
+  geom_vline(xintercept = -observed, color = "red", size = 1.5, linetype = "dashed") +
+  annotate("text", x = observed + 0.3, y = 80, label = "Observed", color = "red", hjust = 0) +
+  labs(
+    x = "Permuted Risk Score",
+    y = "Frequency",
+    title = paste0("Permutation Distribution (Two-tailed P = ", round(p_value, 4), ")")
+  ) +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+```
+
+**Algorithm:**
+
+1. For each permutation $b = 1, \ldots, B$:
+   - Randomly shuffle the gene coefficients $\boldsymbol{\beta}$
+   - Calculate permuted risk scores for all cells
+2. Compute two-tailed P-value:
+
+$$
+p_j = \frac{1}{B} \sum_{b=1}^{B} \mathbb{I}(|RS_j^{(b)}| \geq |RS_j|)
+$$
+
+## FDR Correction
+
+Multiple testing correction using Benjamini-Hochberg procedure:
+
+$$
+FDR_j = \min\left(1, \frac{p_j \cdot m}{\text{rank}(p_j)}\right)
+$$
+
+where $m$ is the total number of cells.
+
+# Cell Classification
+
+Cells are classified based on:
+
+1. **Statistical significance**: FDR < threshold (default 0.05)
+2. **Direction of association**: Sign of normalized risk score
+
+| Category | Criteria |
+|----------|----------|
+| scPAS+ | FDR < 0.05 AND NRS > 0 |
+| scPAS- | FDR < 0.05 AND NRS < 0 |
+| 0 | FDR ≥ 0.05 |
+
+```{r classification-illustration, echo=FALSE, fig.cap="Cell Classification Scheme", fig.width=7, fig.height=5}
+set.seed(42)
+
+# Simulate NRS vs -log10(FDR)
+n_points <- 500
+nrs <- rnorm(n_points, 0, 1.5)
+fdr <- 10^(-abs(nrs) - runif(n_points, 0, 2))
+fdr <- pmin(fdr, 1)
+
+class_df <- data.frame(
+  NRS = nrs,
+  neg_log_FDR = -log10(fdr),
+  Classification = ifelse(
+    fdr >= 0.05, "0",
+    ifelse(nrs > 0, "scPAS+", "scPAS-")
+  )
+)
+class_df$Classification <- factor(class_df$Classification, levels = c("scPAS-", "0", "scPAS+"))
+
+ggplot(class_df, aes(x = NRS, y = neg_log_FDR, color = Classification)) +
+  geom_point(alpha = 0.6, size = 1.5) +
+  geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "gray40") +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "gray40") +
+  scale_color_manual(values = c("scPAS-" = "royalblue", "0" = "gray70", "scPAS+" = "indianred")) +
+  annotate("text", x = 3, y = -log10(0.05) + 0.3, label = "FDR = 0.05", color = "gray40") +
+  labs(
+    x = "Normalized Risk Score (NRS)",
+    y = "-log10(FDR)",
+    title = "Cell Classification Based on NRS and FDR"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "bottom",
+    plot.title = element_text(hjust = 0.5, face = "bold")
+  )
+```
+
+# Implementation Details
+
+## Sparse Matrix Operations
+
+scPAS uses efficient sparse matrix operations for large-scale single-cell data:
+
+```{r sparse-ops, eval=FALSE}
+# Efficient correlation calculation for sparse matrices
+sparse.cor <- function(x) {
+  # Uses optimized algorithm that avoids dense conversion
+  # Handles numerical precision issues
+  # Returns proper correlation matrix
+}
+
+# Efficient row scaling
+sparse_row_scale <- function(x, center = TRUE, scale = TRUE) {
+  # Row-wise standardization
+  # Preserves sparsity when only scaling (not centering)
+}
+```
+
+## Parallel Computing
+
+For large permutation counts, scPAS supports parallel processing:
+
+```{r parallel-example, eval=FALSE}
+result <- scPAS(
+  bulk_dataset = bulk_data,
+  sc_dataset = sc_obj,
+  phenotype = phenotype,
+  permutation_times = 5000,
+  n_cores = 4  # Use 4 CPU cores
+)
+```
+
+# References
+
+1. **Original scPAS Paper**: Xie A, et al. (2024). scPAS: single-cell phenotype-associated subpopulation identifier. *Briefings in Bioinformatics*, 26(1):bbae655.
+
+2. **Network-Regularized Regression**: Zou H, Hastie T. (2005). Regularization and variable selection via the elastic net. *JRSS-B*, 67(2):301-320.
+
+3. **Permutation Testing**: Westfall PH, Young SS. (1993). *Resampling-Based Multiple Testing*. Wiley.
+
+# Session Information
+
+```{r session-info}
+sessionInfo()
+```

@@ -1,0 +1,114 @@
+url: https://zaoqu-liu.github.io/scPAS/
+
+template:
+  bootstrap: 5
+  bootswatch: flatly
+  bslib:
+    primary: "#0d6efd"
+    border-radius: 0.5rem
+    btn-border-radius: 0.25rem
+
+home:
+  title: scPAS - Single-Cell Phenotype-Associated Subpopulation Identifier
+  description: >
+    An R package for identifying phenotype-associated cell subpopulations 
+    from single-cell RNA-seq data by integrating bulk transcriptomics.
+
+authors:
+  Zaoqu Liu:
+    href: https://orcid.org/0000-0002-0452-742X
+  Aimin Xie:
+    href: mailto:aiminyy1993@gmail.com
+
+navbar:
+  structure:
+    left:  [intro, reference, articles, news]
+    right: [search, github]
+  components:
+    intro:
+      text: Get Started
+      href: articles/quick-start.html
+    articles:
+      text: Tutorials
+      menu:
+        - text: "Getting Started"
+        - text: Quick Start Guide
+          href: articles/quick-start.html
+        - text: "---"
+        - text: "Core Concepts"
+        - text: Algorithm and Methodology
+          href: articles/algorithm.html
+        - text: "---"
+        - text: "Visualization"
+        - text: Visualization Gallery
+          href: articles/visualization.html
+        - text: "---"
+        - text: "Case Studies"
+        - text: "Cancer Survival Analysis (Cox)"
+          href: articles/case-survival.html
+        - text: "Binary Classification (Logistic)"
+          href: articles/case-binary.html
+        - text: "---"
+        - text: "Complete Tutorial"
+        - text: Full Tutorial
+          href: articles/scPAS_Tutorial.html
+    reference:
+      text: Reference
+      href: reference/index.html
+    news:
+      text: Changelog
+      href: news/index.html
+
+reference:
+  - title: Main Functions
+    desc: Core functions for scPAS analysis
+    contents:
+      - scPAS
+      - scPAS.prediction
+  - title: Data Preprocessing
+    desc: Functions for data preparation and imputation
+    contents:
+      - run_Seurat
+      - imputation
+      - imputation_KNN
+      - imputation_ALRA
+  - title: Utilities
+    desc: Helper functions
+    contents:
+      - sparse.cor
+
+articles:
+  - title: Getting Started
+    navbar: ~
+    contents:
+      - quick-start
+  - title: Core Concepts
+    contents:
+      - algorithm
+  - title: Visualization
+    contents:
+      - visualization
+  - title: Case Studies
+    contents:
+      - case-survival
+      - case-binary
+  - title: Complete Tutorial
+    contents:
+      - scPAS_Tutorial
+
+figures:
+  dev: ragg::agg_png
+  dpi: 150
+  dev.args: []
+  fig.ext: png
+  fig.width: 7
+  fig.height: 5
+  fig.retina: 2
+
+news:
+  one_page: true
+
+footer:
+  structure:
+    left: developed_by
+    right: built_with

@@ -15,7 +15,7 @@
 #' @param assay Name of Assay to get.
 #' @param tag Names for each phenotypic group. Used for logistic regressions only.
 #' @param nfeature Numeric. The Number of features to select as top variable features in sc_dataset. Top variable features will be used to intersect with the features of bulk_dataset. Default is NULL.All features will be used.
-#' @param imputation Logical. imputation or not.
+#' @param do_imputation Logical. Whether to perform imputation on single-cell data (default: TRUE).
 #' @param imputation_method Character. Name of alternative method for imputation.
 #' @param alpha Numeric. Parameter used to balance the effect of the l1 norm and the network-based penalties. It can be a number or a searching vector.
 #' If \code{alpha = NULL}, a default searching vector is used. The range of alpha is in \code{[0,1]}. A larger alpha lays more emphasis on the l1 norm.
@@ -44,14 +44,104 @@
 #' @import Seurat Matrix preprocessCore
 #'
 #' @export
-scPAS <- function(bulk_dataset, sc_dataset, phenotype,assay = 'RNA', tag = NULL,nfeature = NULL,imputation=T,imputation_method=c('KNN','ALRA'),
-                    alpha = NULL,network_class=c('SC','bulk'),independent=T, family = c("gaussian","binomial","cox"),permutation_times=2000,
-                    FDR.threshold = 0.05, n_cores = 1){
-  # Packages loaded via Imports in DESCRIPTION
+scPAS <- function(bulk_dataset, sc_dataset, phenotype, assay = 'RNA', tag = NULL, 
+                  nfeature = NULL, do_imputation = TRUE, imputation_method = c('KNN','ALRA'),
+                  alpha = NULL, network_class = c('SC','bulk'), independent = TRUE, 
+                  family = c("gaussian","binomial","cox"), permutation_times = 2000,
+                  FDR.threshold = 0.05, n_cores = 1){
+  
+  # ============ Input Validation ============
+  # Validate bulk_dataset
+  if (missing(bulk_dataset) || is.null(bulk_dataset)) {
+    stop("'bulk_dataset' is required.")
+  }
+  if (!is.matrix(bulk_dataset) && !methods::is(bulk_dataset, "Matrix")) {
+    bulk_dataset <- as.matrix(bulk_dataset)
+  }
+  if (nrow(bulk_dataset) < 10) {
+    stop("'bulk_dataset' has too few genes (< 10). Please check input data.")
+  }
+  if (ncol(bulk_dataset) < 3) {
+    stop("'bulk_dataset' has too few samples (< 3). At least 3 samples are required.")
+  }
+  
+  # Validate sc_dataset
+  if (missing(sc_dataset) || is.null(sc_dataset)) {
+    stop("'sc_dataset' is required.")
+  }
+  
+  # Validate phenotype
+  if (missing(phenotype) || is.null(phenotype)) {
+    stop("'phenotype' is required.")
+  }
+  
+  # Match arguments
   network_class <- match.arg(network_class)
   family <- match.arg(family)
   imputation_method <- match.arg(imputation_method)
-  Seurat::DefaultAssay(sc_dataset) <- assay
+  
+  # Validate phenotype based on family
+  if (family == "gaussian") {
+    if (!is.numeric(phenotype)) {
+      stop("For family='gaussian', phenotype must be a numeric vector.")
+    }
+    if (length(phenotype) != ncol(bulk_dataset)) {
+      stop(sprintf("Length of phenotype (%d) must match number of bulk samples (%d).", 
+                   length(phenotype), ncol(bulk_dataset)))
+    }
+  } else if (family == "binomial") {
+    if (is.factor(phenotype)) {
+      if (nlevels(phenotype) != 2) {
+        stop("For family='binomial', phenotype factor must have exactly 2 levels.")
+      }
+      phenotype <- as.numeric(phenotype) - 1
+    } else {
+      phenotype <- as.numeric(phenotype)
+      if (!all(phenotype %in% c(0, 1))) {
+        stop("For family='binomial', phenotype must be 0/1 or a two-level factor.")
+      }
+    }
+    if (length(phenotype) != ncol(bulk_dataset)) {
+      stop(sprintf("Length of phenotype (%d) must match number of bulk samples (%d).", 
+                   length(phenotype), ncol(bulk_dataset)))
+    }
+  } else if (family == "cox") {
+    if (!is.matrix(phenotype) || ncol(phenotype) != 2) {
+      stop("For family='cox', phenotype must be a 2-column matrix (time, status). Use survival::Surv().")
+    }
+    if (!all(c("time", "status") %in% colnames(phenotype))) {
+      colnames(phenotype) <- c("time", "status")
+    }
+    if (nrow(phenotype) != ncol(bulk_dataset)) {
+      stop(sprintf("Number of phenotype rows (%d) must match number of bulk samples (%d).", 
+                   nrow(phenotype), ncol(bulk_dataset)))
+    }
+  }
+  
+  # Validate numeric parameters
+  if (!is.numeric(permutation_times) || permutation_times < 100) {
+    stop("'permutation_times' must be a numeric value >= 100.")
+  }
+  if (!is.numeric(FDR.threshold) || FDR.threshold <= 0 || FDR.threshold >= 1) {
+    stop("'FDR.threshold' must be between 0 and 1 (exclusive).")
+  }
+  if (!is.numeric(n_cores) || n_cores < 1) {
+    stop("'n_cores' must be a positive integer.")
+  }
+  n_cores <- as.integer(n_cores)
+  
+  # Validate alpha if provided
+  if (!is.null(alpha)) {
+    if (!is.numeric(alpha) || any(alpha < 0) || any(alpha > 1)) {
+      stop("'alpha' must be numeric values between 0 and 1.")
+    }
+  }
+  
+  # ============ Main Processing ============
+  # Set default assay for Seurat object
+  if (inherits(sc_dataset, 'Seurat')) {
+    Seurat::DefaultAssay(sc_dataset) <- assay
+  }
 
   if(inherits(sc_dataset, 'Seurat')){
 
@@ -99,7 +189,7 @@ scPAS <- function(bulk_dataset, sc_dataset, phenotype,assay = 'RNA', tag = NULL,
   Expression_bulk <- Expression_bulk[common,]
 
 
-  if(imputation){
+  if(do_imputation){
     sc_dataset <- imputation(sc_dataset, assay = assay, method = imputation_method)
     assay <- Seurat::DefaultAssay(sc_dataset)
   }
@@ -123,23 +213,23 @@ scPAS <- function(bulk_dataset, sc_dataset, phenotype,assay = 'RNA', tag = NULL,
     cor.m <- stats::cor(x)
   }else{
     message("Step 3: Constructing a gene-gene similarity by single cell data....")
-    # Fix: Ensure Expression_cell is converted to sparse matrix before transpose
+    # Ensure sparse matrix format for efficient transpose
     if (!methods::is(Expression_cell, "sparseMatrix")) {
       Expression_cell <- methods::as(Expression_cell, "sparseMatrix")
     }
-    Expression_cell_t <- Matrix::t(Expression_cell)  # Use Matrix::t for sparse matrices
+    Expression_cell_t <- Matrix::t(Expression_cell)
     cor.m <- sparse.cor(Expression_cell_t)
   }
-  # Fix: Use direct logical indexing
+  # Set negative correlations to zero (only positive correlations are used)
   cor.m[cor.m < 0] <- 0
-  # Fix: Add rownames/colnames for FindNeighbors (should be gene names)
+  # Ensure row/column names for FindNeighbors
   if (is.null(rownames(cor.m))) {
     rownames(cor.m) <- colnames(cor.m) <- rownames(Expression_cell)
   }
   SNN <- Seurat::FindNeighbors(1 - cor.m, distance.matrix = TRUE)
   Network <- as.matrix(SNN$snn)
   diag(Network) <- 0
-  # Fix: Replace NA with 0 and ensure numeric before threshold
+  # Replace NA values and apply threshold
   Network[is.na(Network)] <- 0
   Network[Network > 0.2] <- 1
   Network[Network <= 0.2] <- 0
@@ -148,7 +238,11 @@ scPAS <- function(bulk_dataset, sc_dataset, phenotype,assay = 'RNA', tag = NULL,
   if (family == "binomial"){
     y <- as.numeric(phenotype)
     z <- table(y)
-    message(sprintf("Current phenotype contains %d %s and %d %s samples.", z[1], tag[1], z[2], tag[2]))
+    if (!is.null(tag) && length(tag) >= 2) {
+      message(sprintf("Current phenotype contains %d %s and %d %s samples.", z[1], tag[1], z[2], tag[2]))
+    } else {
+      message(sprintf("Current phenotype contains %d class-0 and %d class-1 samples.", z[1], z[2]))
+    }
     message("Performing logistic regression on the given phenotypes...")
   }
   if (family == "gaussian"){
@@ -193,14 +287,14 @@ scPAS <- function(bulk_dataset, sc_dataset, phenotype,assay = 'RNA', tag = NULL,
   message("Step 5: Calculating quantified risk scores....")
   names(Coefs) <- colnames(x)
   
-  # Use sparse-aware scaling to preserve sparsity and reduce memory usage
+  # Scale expression data by row (gene)
   scaled_exp <- sparse_row_scale(Expression_cell, center = TRUE, scale = TRUE)
   colnames(scaled_exp) <- colnames(Expression_cell)
   rownames(scaled_exp) <- rownames(Expression_cell)
-  # Fix: Use direct logical indexing for NA replacement
+  # Replace NA values with 0
   scaled_exp[is.na(scaled_exp)] <- 0
   
-  # Parallel permutation test for better performance
+  # Permutation test for significance
   if (n_cores > 1) {
     message(paste0("Step 6: Qualitative identification by permutation test (", 
                   permutation_times, " permutations, ", n_cores, " cores)"))
@@ -220,7 +314,7 @@ scPAS <- function(bulk_dataset, sc_dataset, phenotype,assay = 'RNA', tag = NULL,
   risk_score <- perm_results$risk_score
   risk_score.background <- perm_results$risk_score.background
   
-  # Fix: Ensure risk_score.background is a matrix
+  # Ensure matrix format for background distribution
   if (!is.matrix(risk_score.background)) {
     risk_score.background <- as.matrix(risk_score.background)
   }
@@ -228,14 +322,26 @@ scPAS <- function(bulk_dataset, sc_dataset, phenotype,assay = 'RNA', tag = NULL,
   if(independent){
     mean.background <- Matrix::rowMeans(risk_score.background)
     sd.background <- apply(risk_score.background, 1, stats::sd)
+    # Handle zero standard deviation (constant background)
+    sd.background[sd.background == 0 | !is.finite(sd.background)] <- 1
   }else{
     mean.background <- mean(as.matrix(risk_score.background))
     sd.background <- stats::sd(as.matrix(risk_score.background))
+    # Handle zero standard deviation
+    if (sd.background == 0 || !is.finite(sd.background)) {
+      sd.background <- 1
+    }
   }
 
   Z <- (risk_score[,1] - mean.background) / sd.background
+  # Handle non-finite Z values
+  Z[!is.finite(Z)] <- 0
 
-  p.value <- stats::pnorm(q = abs(Z), mean = 0, sd = 1, lower.tail = FALSE)
+  # Two-tailed p-value: multiply by 2 for proper statistical testing
+  # This tests for both positive and negative deviations from null
+  p.value <- 2 * stats::pnorm(q = abs(Z), mean = 0, sd = 1, lower.tail = FALSE)
+  # Cap p-value at 1 (can exceed 1 due to floating point in extreme cases)
+  p.value <- pmin(p.value, 1)
   q.value <- stats::p.adjust(p = p.value, method = 'BH')
   risk_score_data.frame <- data.frame(
     cell = colnames(Expression_cell),
@@ -250,7 +356,7 @@ scPAS <- function(bulk_dataset, sc_dataset, phenotype,assay = 'RNA', tag = NULL,
                                               ifelse(Z < 0 & q.value <= FDR.threshold, 'scPAS-', '0'))
 
   sc_dataset@misc$scPAS_para <- list(
-    alpha = alpha[1:i], 
+    alpha = alpha, 
     lambda = lambda, 
     family = family,
     Coefs = Coefs,
@@ -366,7 +472,7 @@ imputation <- function(obj,assay='RNA',method=c('KNN','ALRA')){
     print("Step2: Imputation of missing values in single cell RNA-sequencing data with ALRA")
     obj <- imputation_ALRA(obj = obj,assay = assay)
   }else{
-    warnings(paste0('The ',method, 'method does not exist, so imputaion is invalid!'))
+    warning(paste0("The '", method, "' method does not exist, so imputation is invalid!"))
   }
   return(obj)
 }
@@ -438,57 +544,133 @@ imputation_KNN <- function (obj,assay='RNA', LogNormalized = TRUE)
 }
 
 
-#' A function compute the correlation of a sparse matrix.
+#' Compute correlation matrix for a sparse matrix
 #'
-#' @param x Matrix. Normalized single cell expression profile extracted from Seurat object.
+#' @description
+#' Computes the Pearson correlation matrix for a sparse matrix
+#' without full dense conversion.
 #'
-#' @return A correlation matrix.
+#' @param x Matrix. Normalized single cell expression profile (cells x genes).
+#'   Each row is a cell, each column is a gene.
 #'
+#' @return A correlation matrix (genes x genes).
 #'
+#' @details
+#' This function handles sparse matrices by:
+#' 1. Processing non-zero elements separately
+#' 2. Handling numerical precision issues
+#' 3. Ensuring proper correlation matrix properties (diagonal = 1, range [-1, 1])
 #'
-#'
+#' @keywords internal
 sparse.cor <- function(x){
   # Ensure x is a sparse matrix
   if(!methods::is(x, "sparseMatrix")){
     x <- methods::as(x, "sparseMatrix")
   }
   
-  n <- nrow(x)
-  m <- ncol(x)
-  ii <- unique(x@i) + 1 # rows with a non-zero element
-
-  # Fix: Use Matrix::colMeans for sparse matrices
-  Ex <- Matrix::colMeans(x)
+  n <- nrow(x)  # number of observations (cells)
+  m <- ncol(x)  # number of variables (genes)
   
-  # Fix: Convert to vector properly
-  nozero <- as.vector(as.matrix(x[ii, , drop = FALSE])) - rep(Ex, each = length(ii))
-
-  covmat <- (crossprod(matrix(nozero, ncol = m)) +
-              Matrix::tcrossprod(Ex) * (n - length(ii))
-  ) / (n - 1)
-  sdvec <- sqrt(diag(covmat))
-  covmat / Matrix::tcrossprod(sdvec)
+  # Handle edge cases
+  if (n < 2) {
+    warning("Less than 2 observations, returning identity matrix")
+    return(diag(m))
+  }
+  if (m < 2) {
+    return(matrix(1, 1, 1))
+  }
+  
+  # Column means (gene means across cells)
+  Ex <- as.vector(Matrix::colMeans(x))
+  
+  # Get indices of rows with at least one non-zero element
+  ii <- unique(x@i) + 1  # 1-based indices
+  
+  # If all rows have non-zero elements, use standard correlation
+  if (length(ii) == n) {
+    # Convert to dense and use standard cor
+    return(stats::cor(as.matrix(x)))
+  }
+  
+  # Compute covariance matrix efficiently
+  # Cov(X,Y) = E[XY] - E[X]E[Y]
+  # For sparse matrices, we compute E[XY] from non-zero rows
+  # and adjust for zero rows
+  
+  # Extract non-zero rows as dense matrix
+  x_nonzero <- as.matrix(x[ii, , drop = FALSE])
+  
+  # Center the non-zero portion
+  x_centered <- x_nonzero - matrix(Ex, nrow = length(ii), ncol = m, byrow = TRUE)
+  
+  # Contribution from non-zero rows
+  covmat_nonzero <- crossprod(x_centered)
+  
+  # Contribution from zero rows (they contribute -Ex * -Ex = Ex^2)
+  n_zero_rows <- n - length(ii)
+  if (n_zero_rows > 0) {
+    covmat_zero <- tcrossprod(Ex) * n_zero_rows
+    covmat <- (covmat_nonzero + covmat_zero) / (n - 1)
+  } else {
+    covmat <- covmat_nonzero / (n - 1)
+  }
+  
+  # Compute standard deviations
+  sdvec <- sqrt(pmax(diag(covmat), 0))  # Ensure non-negative
+  
+  # Handle zero variance (constant columns)
+  sdvec[sdvec == 0 | !is.finite(sdvec)] <- 1
+  
+  # Compute correlation matrix
+  cormat <- covmat / tcrossprod(sdvec)
+  
+  # Ensure diagonal is exactly 1 and values are in [-1, 1]
+  diag(cormat) <- 1
+  cormat[cormat > 1] <- 1
+  cormat[cormat < -1] <- -1
+  
+  # Handle any remaining NA/NaN values
+  cormat[!is.finite(cormat)] <- 0
+  
+  return(cormat)
 }
 
 
 
 #' scPAS.prediction: A function that uses the scPAS model to make predictions on independent data
 #'
-#' @param model seurat object. A seurat object containing the scPAS model
-#' @param test.data Matrix or seurat object. Single-cell RNA-seq expression matrix of related disease. Each row represents a gene and each column represents a sample. A Seurat object that contains the preprocessed data and constructed network is preferred.
+#' @param model Seurat object. A Seurat object containing the scPAS model (from running scPAS()).
+#' @param test.data Matrix or Seurat object. Single-cell RNA-seq expression matrix of related disease. 
+#'   Each row represents a gene and each column represents a sample. A Seurat object that contains 
+#'   the preprocessed data and constructed network is preferred.
 #' @param assay Name of Assay to get.
 #' @param FDR.threshold Numeric. FDR value threshold for identifying phenotype-associated cells.
-#' The default is 0.05.
+#'   The default is 0.05.
+#' @param do_imputation Logical. Whether to perform imputation on the test data (default: FALSE).
+#' @param imputation_method Character. Imputation method: "KNN" or "ALRA".
+#' @param independent Logical. Whether to compute background distribution independently for each cell.
+#' @param permutation_times Integer. Number of permutations for significance testing (default: 2000).
+#' @param n_cores Integer. Number of CPU cores for parallel processing (default: 1).
 #'
-#'@return A seurat object or data frame containing the forecast results.
+#' @return A Seurat object or data frame containing the prediction results.
 #'
 #' @export
-scPAS.prediction <- function(model, test.data, assay = 'RNA', FDR.threshold = 0.05, imputation = FALSE, imputation_method = 'KNN', independent = TRUE){
-
-  model <- model@misc$scPAS_para
+scPAS.prediction <- function(model, test.data, assay = 'RNA', FDR.threshold = 0.05, 
+                             do_imputation = FALSE, imputation_method = 'KNN', 
+                             independent = TRUE, permutation_times = 2000, n_cores = 1){
+  
+  # Validate inputs
+  if (!inherits(model, 'Seurat')) {
+    stop("'model' must be a Seurat object returned by scPAS()")
+  }
+  if (is.null(model@misc$scPAS_para)) {
+    stop("The model does not contain scPAS parameters. Please run scPAS() first.")
+  }
+  
+  model_params <- model@misc$scPAS_para
 
   if(inherits(test.data, 'Seurat')){
-    if(imputation){
+    if(do_imputation){
       test.data <- imputation(test.data, assay = assay, method = imputation_method)
       assay <- Seurat::DefaultAssay(test.data)
     }
@@ -496,8 +678,6 @@ scPAS.prediction <- function(model, test.data, assay = 'RNA', FDR.threshold = 0.
     Expression_cell <- test.exp
     rownames(Expression_cell) <- rownames(test.exp)
     colnames(Expression_cell) <- colnames(test.exp)
-
-
   }else{
     test.exp <- as.matrix(test.data)
     Expression_cell <- methods::as(preprocessCore::normalize.quantiles(as.matrix(test.exp)), 'dgCMatrix')
@@ -505,34 +685,51 @@ scPAS.prediction <- function(model, test.data, assay = 'RNA', FDR.threshold = 0.
     colnames(Expression_cell) <- colnames(test.exp)
   }
 
-  Coefs <- model$Coefs
+  Coefs <- model_params$Coefs
   common <- intersect(names(Coefs), rownames(Expression_cell))
-
-  if(sum(Coefs != 0) < 20){
-    stop("There are too few valid features and the test data may not be suitable for the model!")
+  
+  # Check feature overlap
+  n_nonzero_coefs <- sum(Coefs[common] != 0)
+  if(n_nonzero_coefs < 20){
+    warning(sprintf("Only %d non-zero features overlap between model and test data. Results may be unreliable.", n_nonzero_coefs))
+    if(n_nonzero_coefs == 0){
+      stop("No valid features found. The test data may not be suitable for this model.")
+    }
   }
+  
+  message(sprintf("Using %d common features (%d with non-zero coefficients)", 
+                  length(common), n_nonzero_coefs))
 
   Coefs <- Coefs[common]
   Expression_cell <- Expression_cell[common, ]
   
-  # Use sparse-aware scaling to preserve sparsity
+  # Scale expression data
   scaled_exp <- sparse_row_scale(Expression_cell, center = TRUE, scale = TRUE)
   colnames(scaled_exp) <- colnames(Expression_cell)
   rownames(scaled_exp) <- rownames(Expression_cell)
-  # Fix: Use direct logical indexing for NA replacement
   scaled_exp[is.na(scaled_exp)] <- 0
-  risk_score <- crossprod(scaled_exp, Coefs)
-
-  set.seed(12345)
-
-  randomPermutation <- sapply(1:2000, FUN = function(x){
-    set.seed(1234 + x)
-    sample(Coefs, length(Coefs), replace = FALSE)
-  })
-  randomPermutation <- methods::as(randomPermutation, "sparseMatrix")
-  risk_score.background <- crossprod(scaled_exp, randomPermutation)
   
-  # Fix: Ensure risk_score.background is a matrix
+  # Permutation test for significance
+  if (n_cores > 1) {
+    message(sprintf("Running permutation test with %d permutations using %d cores...", 
+                    permutation_times, n_cores))
+  } else {
+    message(sprintf("Running permutation test with %d permutations (sequential)...", 
+                    permutation_times))
+  }
+  
+  perm_results <- parallel_permutation_test(
+    scaled_exp = scaled_exp,
+    Coefs = Coefs,
+    permutation_times = permutation_times,
+    n_cores = n_cores,
+    seed = 12345
+  )
+  
+  risk_score <- perm_results$risk_score
+  risk_score.background <- perm_results$risk_score.background
+  
+  # Ensure risk_score.background is a matrix
   if (!is.matrix(risk_score.background)) {
     risk_score.background <- as.matrix(risk_score.background)
   }
@@ -540,14 +737,21 @@ scPAS.prediction <- function(model, test.data, assay = 'RNA', FDR.threshold = 0.
   if(independent){
     mean.background <- Matrix::rowMeans(risk_score.background)
     sd.background <- apply(risk_score.background, 1, stats::sd)
+    # Handle zero standard deviation
+    sd.background[sd.background == 0 | !is.finite(sd.background)] <- 1
   }else{
     mean.background <- mean(as.matrix(risk_score.background))
     sd.background <- stats::sd(as.matrix(risk_score.background))
+    if (sd.background == 0 || !is.finite(sd.background)) {
+      sd.background <- 1
+    }
   }
 
   Z <- (risk_score[,1] - mean.background) / sd.background
 
-  p.value <- stats::pnorm(q = abs(Z), mean = 0, sd = 1, lower.tail = FALSE)
+  # Two-tailed p-value for proper statistical testing
+  p.value <- 2 * stats::pnorm(q = abs(Z), mean = 0, sd = 1, lower.tail = FALSE)
+  p.value <- pmin(p.value, 1)  # Cap at 1
   q.value <- stats::p.adjust(p = p.value, method = 'BH')
 
   risk_score_data.frame <- data.frame(
@@ -567,11 +771,14 @@ scPAS.prediction <- function(model, test.data, assay = 'RNA', FDR.threshold = 0.
     test.data <- Seurat::AddMetaData(test.data, metadata = risk_score_data.frame$scPAS_Pvalue, col.name = "scPAS_Pvalue")
     test.data <- Seurat::AddMetaData(test.data, metadata = risk_score_data.frame$scPAS_FDR, col.name = "scPAS_FDR")
     test.data <- Seurat::AddMetaData(test.data, metadata = risk_score_data.frame$scPAS, col.name = "scPAS")
+    
+    # Report summary
+    n_pos <- sum(risk_score_data.frame$scPAS == "scPAS+")
+    n_neg <- sum(risk_score_data.frame$scPAS == "scPAS-")
+    message(sprintf("Prediction complete: %d scPAS+ cells, %d scPAS- cells (FDR < %.2f)", 
+                    n_pos, n_neg, FDR.threshold))
     return(test.data)
   }else{
     return(risk_score_data.frame)
   }
-
-
-
 }

@@ -1,64 +1,85 @@
 #' Sparse Matrix Row Scaling (Internal Function)
 #'
 #' @description
-#' Efficiently scale rows of a sparse matrix while preserving sparsity.
-#' This function is optimized for large sparse matrices and avoids converting
-#' to dense format.
+#' Scale rows of a sparse matrix by centering and/or scaling.
+#' Note: centering requires dense conversion as it destroys sparsity.
 #'
-#' @param x A sparse matrix (dgCMatrix or similar)
+#' @param x A sparse matrix (dgCMatrix or similar) or dense matrix
 #' @param center Logical. Should rows be centered? (default: TRUE)
 #' @param scale Logical. Should rows be scaled? (default: TRUE)
 #'
-#' @return A sparse matrix with scaled rows
+#' @return A matrix with scaled rows (dense if centered, sparse if scale-only)
 #'
 #' @keywords internal
 sparse_row_scale <- function(x, center = TRUE, scale = TRUE) {
-  if (!methods::is(x, "sparseMatrix")) {
-    x <- methods::as(x, "sparseMatrix")
+  # Ensure we have a matrix
+  if (!is.matrix(x) && !methods::is(x, "sparseMatrix")) {
+    x <- as.matrix(x)
   }
   
-  # Calculate row statistics
-  if (center) {
+  # Calculate row statistics using efficient sparse methods
+  n_cols <- ncol(x)
+  
+  if (methods::is(x, "sparseMatrix")) {
     row_means <- Matrix::rowMeans(x)
+    if (scale) {
+      # Use sample variance formula: sum((x - mean)^2) / (n-1)
+      # = (sum(x^2) - n * mean^2) / (n-1)
+      # = n/(n-1) * (mean(x^2) - mean^2)
+      row_sq_means <- Matrix::rowMeans(x^2)
+      row_vars <- (row_sq_means - row_means^2) * n_cols / (n_cols - 1)
+      # Handle numerical precision issues
+      row_vars[row_vars < 0] <- 0
+      row_sds <- sqrt(row_vars)
+      # Avoid division by zero
+      row_sds[row_sds == 0 | !is.finite(row_sds)] <- 1
+    }
   } else {
-    row_means <- rep(0, nrow(x))
+    row_means <- rowMeans(x, na.rm = TRUE)
+    if (scale) {
+      row_sds <- apply(x, 1, stats::sd, na.rm = TRUE)
+      row_sds[row_sds == 0 | is.na(row_sds) | !is.finite(row_sds)] <- 1
+    }
   }
   
-  if (scale) {
-    # Calculate row standard deviations efficiently
-    row_vars <- Matrix::rowMeans(x^2) - row_means^2
-    row_sds <- sqrt(pmax(row_vars, 0))  # Avoid negative values from floating point errors
-    row_sds[row_sds == 0] <- 1  # Avoid division by zero
-  } else {
-    row_sds <- rep(1, nrow(x))
+  if (!center && !scale) {
+    return(x)
   }
   
-  # Scale: (x - mean) / sd
-  # Use sparse matrix operations to preserve sparsity
-  x_scaled <- x
-  
-  # Center
+  # Centering requires dense conversion (centering destroys sparsity)
   if (center) {
+    if (methods::is(x, "sparseMatrix")) {
+      # Convert to dense for centering
+      x_scaled <- as.matrix(x)
+    } else {
+      x_scaled <- x
+    }
+    # Center rows (subtract row means)
     x_scaled <- x_scaled - row_means
+  } else {
+    x_scaled <- x
   }
   
-  # Scale
+  # Scale rows (divide by row sds)
   if (scale) {
-    x_scaled <- x_scaled / row_sds
+    if (methods::is(x_scaled, "sparseMatrix")) {
+      # Scale sparse matrix row-wise using diagonal multiplication
+      D_inv <- Matrix::Diagonal(x = 1 / row_sds)
+      x_scaled <- D_inv %*% x_scaled
+    } else {
+      x_scaled <- x_scaled / row_sds
+    }
   }
-  
-  # Ensure it's still sparse
-  x_scaled <- methods::as(x_scaled, "sparseMatrix")
   
   return(x_scaled)
 }
 
 
-#' Parallel Permutation Test (Internal Function)
+#' Permutation Test (Internal Function)
 #'
 #' @description
-#' Perform permutation test in parallel to speed up computation.
-#' This function uses the future package for parallel processing.
+#' Perform permutation test for statistical significance.
+#' Supports parallel processing via the future package.
 #'
 #' @param scaled_exp Scaled expression matrix
 #' @param Coefs Coefficient vector
