@@ -405,8 +405,9 @@ ggplot(interpretation_nonresp, aes(x = reorder(CellType, seq_len(nrow(interpreta
 ## Extract Response Signature
 
 ```{r response-signature}
-# Get model coefficients
-coefs <- result@misc$scPAS_para$Coefs
+# Get model coefficients (compatible with Seurat 4 and 5)
+scPAS_params <- Seurat::Misc(result, slot = "scPAS_para")
+coefs <- scPAS_params$Coefs
 coefs <- coefs[coefs != 0]
 
 # Top positive (responder) genes

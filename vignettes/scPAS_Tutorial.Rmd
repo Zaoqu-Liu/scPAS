@@ -79,8 +79,14 @@ head(phenotype)
 Single-cell data needs to be processed using the Seurat pipeline to create a Seurat object suitable for visualization. To avoid the impact of extremely sparsely expressed genes on the model, they need to be removed beforehand.
 
 ```{r}
-keep_genes <- rownames(sc_dataset)[rowSums(sc_dataset@assays$RNA@counts>1) >= 20]
-sc_dataset <- subset(sc_dataset,features = keep_genes)
+# Get count matrix (compatible with Seurat 4 and 5)
+if (utils::packageVersion("SeuratObject") >= "5.0.0") {
+  counts_matrix <- Seurat::GetAssayData(sc_dataset, assay = "RNA", layer = "counts")
+} else {
+  counts_matrix <- Seurat::GetAssayData(sc_dataset, assay = "RNA", slot = "counts")
+}
+keep_genes <- rownames(sc_dataset)[rowSums(counts_matrix > 1) >= 20]
+sc_dataset <- subset(sc_dataset, features = keep_genes)
 
 sc_dataset <- run_Seurat(sc_dataset,verbose = FALSE)
 
@@ -198,9 +204,11 @@ Other imputation methods can also be used. Users can manually create a new assay
 The returned Seurat object not only contains the prediction results for each single cell but also provides the trained model.
 
 ```{r warning=FALSE}
-names(sc_dataset@misc$scPAS_para)
-head(sort(sc_dataset@misc$scPAS_para$Coefs))
-tail(sort(sc_dataset@misc$scPAS_para$Coefs))
+# Access model parameters (compatible with Seurat 4 and 5)
+scPAS_params <- Seurat::Misc(sc_dataset, slot = "scPAS_para")
+names(scPAS_params)
+head(sort(scPAS_params$Coefs))
+tail(sort(scPAS_params$Coefs))
 ```
 
 Applying this model to other independent bulk data can enable the prediction of prognostic risk for bulk samples.

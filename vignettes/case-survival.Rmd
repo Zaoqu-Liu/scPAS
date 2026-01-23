@@ -392,8 +392,8 @@ p_a + p_b + p_c + p_d + p_e + plot_layout(design = layout)
 The trained model can be applied to independent datasets:
 
 ```{r model-application, eval=FALSE}
-# Get trained model parameters
-model_params <- result@misc$scPAS_para
+# Get trained model parameters (compatible with Seurat 4 and 5)
+model_params <- Seurat::Misc(result, slot = "scPAS_para")
 head(sort(model_params$Coefs, decreasing = TRUE))
 
 # Apply to new bulk data

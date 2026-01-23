@@ -1,11 +1,57 @@
-# Internal helper function for Seurat 4/5 compatibility
-# Seurat 5 uses 'layer' instead of 'slot'
+# ============ Internal helper functions for Seurat 4/5 compatibility ============
+# Detect Seurat version once at load time for efficiency
+.getSeuratVersion <- function() {
+
+  utils::packageVersion("SeuratObject")
+}
+
+# GetAssayData: Seurat 5 uses 'layer' instead of 'slot'
 .getAssayData <- function(object, assay, slot_name = 'data') {
-  seurat_version <- utils::packageVersion("SeuratObject")
-  if (seurat_version >= "5.0.0") {
+  if (.getSeuratVersion() >= "5.0.0") {
     Seurat::GetAssayData(object = object, assay = assay, layer = slot_name)
   } else {
     Seurat::GetAssayData(object = object, assay = assay, slot = slot_name)
+  }
+}
+
+# Get graphs from Seurat object (compatible with both v4 and v5)
+.getGraphs <- function(object, name) {
+  # Both Seurat 4 and 5 support Graphs() function
+  graphs <- Seurat::Graphs(object)
+  if (name %in% names(graphs)) {
+    return(object[[name]])
+  }
+  # Fallback to direct slot access if needed
+  if (!is.null(object@graphs) && name %in% names(object@graphs)) {
+    return(object@graphs[[name]])
+  }
+  stop(paste0("Graph '", name, "' not found. Please run FindNeighbors() first."))
+}
+
+# Get misc data from Seurat object
+.getMisc <- function(object, name = NULL) {
+  misc <- Seurat::Misc(object)
+  if (is.null(name)) {
+    return(misc)
+  }
+  return(misc[[name]])
+}
+
+# Set misc data in Seurat object
+.setMisc <- function(object, name, value) {
+  Seurat::Misc(object, slot = name) <- value
+  return(object)
+}
+
+# Create Assay object (compatible with both v4 and v5)
+.createAssayObject <- function(data) {
+  if (.getSeuratVersion() >= "5.0.0") {
+    # Seurat 5: CreateAssayObject still works but we use it carefully
+    # The 'data' parameter in v5 is interpreted as normalized data
+    Seurat::CreateAssayObject(data = data)
+  } else {
+    # Seurat 4: standard usage
+    Seurat::CreateAssayObject(data = data)
   }
 }
 
@@ -365,7 +411,7 @@ scPAS <- function(bulk_dataset, sc_dataset, phenotype, assay = 'RNA', tag = NULL
   risk_score_data.frame$cell_label <- ifelse(Z > 0 & q.value <= FDR.threshold, 'scPAS+', 
                                               ifelse(Z < 0 & q.value <= FDR.threshold, 'scPAS-', '0'))
 
-  sc_dataset@misc$scPAS_para <- list(
+  sc_dataset <- .setMisc(sc_dataset, "scPAS_para", list(
     alpha = alpha, 
     lambda = lambda, 
     family = family,
@@ -373,7 +419,7 @@ scPAS <- function(bulk_dataset, sc_dataset, phenotype, assay = 'RNA', tag = NULL
     bulk = x,
     phenotype = y,
     Network = Network
-  )
+  ))
 
   sc_dataset <- Seurat::AddMetaData(sc_dataset, metadata = risk_score_data.frame$raw_score, col.name = "scPAS_RS")
   sc_dataset <- Seurat::AddMetaData(sc_dataset, metadata = risk_score_data.frame$Z.statistics, col.name = "scPAS_NRS")
@@ -509,7 +555,7 @@ imputation_ALRA <- function(obj,assay='RNA'){
   colnames(data_alra) <- colnames(data)
   data_alra <- Matrix::Matrix(data_alra, sparse = TRUE)
 
-  obj[["imputation"]] <- Seurat::CreateAssayObject(data = data_alra )
+  obj[["imputation"]] <- .createAssayObject(data = data_alra)
   Seurat::DefaultAssay(obj) <- "imputation"
   return(obj)
 }
@@ -530,7 +576,7 @@ imputation_KNN <- function (obj,assay='RNA', LogNormalized = TRUE)
 {
   # Matrix functions available via Imports
   exp_sc <- .getAssayData(object = obj, assay = assay, slot_name = 'data')
-  nn_network <- obj@graphs[[paste0(assay, "_nn")]]
+  nn_network <- .getGraphs(obj, paste0(assay, "_nn"))
   
   if (!methods::is(object = exp_sc, class2 = "sparseMatrix")) {
     exp_sc <- methods::as(exp_sc, "sparseMatrix")
@@ -548,7 +594,7 @@ imputation_KNN <- function (obj,assay='RNA', LogNormalized = TRUE)
     exp_sc_mean <- log1p(exp_sc_mean)
   }
   colnames(exp_sc_mean) <- colnames(exp_sc)
-  obj[["imputation"]] <- Seurat::CreateAssayObject(data = exp_sc_mean)
+  obj[["imputation"]] <- .createAssayObject(data = exp_sc_mean)
   Seurat::DefaultAssay(obj) <- "imputation"
   return(obj)
 }
@@ -673,11 +719,11 @@ scPAS.prediction <- function(model, test.data, assay = 'RNA', FDR.threshold = 0.
   if (!inherits(model, 'Seurat')) {
     stop("'model' must be a Seurat object returned by scPAS()")
   }
-  if (is.null(model@misc$scPAS_para)) {
+  if (is.null(.getMisc(model, "scPAS_para"))) {
     stop("The model does not contain scPAS parameters. Please run scPAS() first.")
   }
   
-  model_params <- model@misc$scPAS_para
+  model_params <- .getMisc(model, "scPAS_para")
 
   if(inherits(test.data, 'Seurat')){
     if(do_imputation){

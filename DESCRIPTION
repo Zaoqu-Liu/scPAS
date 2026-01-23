@@ -12,10 +12,9 @@ Description: Identifies phenotype-associated cell subpopulations from single-cel
     data by integrating bulk RNA-seq data with phenotype information. This package uses 
     network-regularized sparse regression to quantify the strength of association between 
     each cell and a phenotype (e.g., disease stage, tumor metastasis, treatment response, 
-    survival outcomes). Compatible with Seurat v4 (4.0.0-4.4.0) and SeuratObject v4 
-    (4.0.0-4.1.4). The method supports Gaussian (continuous), binomial (binary), and 
-    Cox (survival) regression families. Version 1.0.2 includes full cross-platform 
-    compatibility (Windows, macOS, Linux) with proper DLL/SO loading.
+    survival outcomes). Compatible with both Seurat v4 (4.0.0+) and Seurat v5 (5.0.0+).
+    The method supports Gaussian (continuous), binomial (binary), and Cox (survival) 
+    regression families. Full cross-platform compatibility (Windows, macOS, Linux).
 URL: https://github.com/Zaoqu-Liu/scPAS
 BugReports: https://github.com/Zaoqu-Liu/scPAS/issues
 Depends: R (>= 4.0.0)
