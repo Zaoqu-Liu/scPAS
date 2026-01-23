@@ -1,2 +1,14 @@
 ^doc$
 ^Meta$
+^.*\.Rproj$
+^\.Rproj\.user$
+^\.github$
+^README\.Rmd$
+^LICENSE\.md$
+^_pkgdown\.yml$
+^docs$
+^pkgdown$
+^scPAS\.Rcheck$
+^scPAS.*\.tar\.gz$
+^\.gitignore$
+^data-raw$
