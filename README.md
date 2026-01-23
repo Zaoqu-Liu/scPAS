@@ -1,8 +1,8 @@
 # scPAS: Single-Cell Phenotype-Associated Subpopulation Identifier
 
 <!-- badges: start -->
+[![R-CMD-check](https://github.com/Zaoqu-Liu/scPAS/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/Zaoqu-Liu/scPAS/actions/workflows/R-CMD-check.yaml)
 [![R-universe](https://zaoqu-liu.r-universe.dev/badges/scPAS)](https://zaoqu-liu.r-universe.dev/scPAS)
-[![R-CMD-check](https://img.shields.io/badge/R--CMD--check-passing-brightgreen.svg)](https://github.com/Zaoqu-Liu/scPAS)
 [![R Version](https://img.shields.io/badge/R-%E2%89%A5%204.0.0-blue.svg)](https://www.r-project.org/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![DOI](https://img.shields.io/badge/DOI-10.1093%2Fbib%2Fbbae655-blue.svg)](https://doi.org/10.1093/bib/bbae655)
