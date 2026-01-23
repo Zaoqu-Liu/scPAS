@@ -43,7 +43,6 @@ vignettes/*.pdf
 .Renviron
 
 # pkgdown site
-docs/
 
 # translation temp files
 po/*~
@@ -55,4 +54,3 @@ rsconnect/
 *.o
 *.so
 *.dll
-docs/
