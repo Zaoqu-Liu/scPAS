@@ -54,3 +54,5 @@ rsconnect/
 *.o
 *.so
 *.dll
+/doc/
+/Meta/

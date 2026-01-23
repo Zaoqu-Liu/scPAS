@@ -1,7 +1,7 @@
 Package: scPAS
 Type: Package
 Title: Single-Cell Phenotype-Associated Subpopulation Identifier
-Version: 1.0.3
+Version: 1.0.4
 Authors@R: c(
     person("Aimin", "Xie", email = "aiminyy1993@gmail.com", role = "aut", comment = "Original author"),
     person("Zaoqu", "Liu", email = "liuzaoqu@163.com", role = c("aut", "cre"), 

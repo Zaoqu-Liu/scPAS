@@ -1,3 +1,17 @@
+# scPAS 1.0.4
+
+## API Compatibility
+
+* Full compatibility with both Seurat v4 (4.0.0+) and Seurat v5 (5.0.0+)
+* Added internal helper functions for version-aware API calls:
+  - `.getAssayData()`: Auto-detects `slot` vs `layer` parameter
+  - `.getGraphs()`: Compatible graph data access
+  - `.getMisc()` / `.setMisc()`: Compatible misc slot access
+  - `.createAssayObject()`: Compatible assay creation
+* Updated all vignettes to use Seurat-version-aware code patterns
+
+---
+
 # scPAS 1.0.3
 
 ## Bug Fixes
