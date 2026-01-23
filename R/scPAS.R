@@ -16,8 +16,8 @@
 
 # Get graphs from Seurat object (compatible with both v4 and v5)
 .getGraphs <- function(object, name) {
-  # Both Seurat 4 and 5 support Graphs() function
-  graphs <- Seurat::Graphs(object)
+  # Both Seurat 4 and 5 support Graphs() function from SeuratObject
+  graphs <- SeuratObject::Graphs(object)
   if (name %in% names(graphs)) {
     return(object[[name]])
   }
