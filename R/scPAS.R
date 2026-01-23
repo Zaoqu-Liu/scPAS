@@ -1,3 +1,13 @@
+# Internal helper function for Seurat 4/5 compatibility
+# Seurat 5 uses 'layer' instead of 'slot'
+.getAssayData <- function(object, assay, slot_name = 'data') {
+  seurat_version <- utils::packageVersion("SeuratObject")
+  if (seurat_version >= "5.0.0") {
+    Seurat::GetAssayData(object = object, assay = assay, layer = slot_name)
+  } else {
+    Seurat::GetAssayData(object = object, assay = assay, slot = slot_name)
+  }
+}
 
 #' scPAS : A tool for identifying Phenotype-Associated cell Subpopulations from single-cell sequencing data by integrating bulk data
 #'
@@ -195,7 +205,7 @@ scPAS <- function(bulk_dataset, sc_dataset, phenotype, assay = 'RNA', tag = NULL
   }
 
   message("Step 2: Extracting single-cell expression profiles....")
-  sc_exprs <- Seurat::GetAssayData(object = sc_dataset, assay = assay, layer = 'data')
+  sc_exprs <- .getAssayData(object = sc_dataset, assay = assay, slot_name = 'data')
   #Expression_cell <- as(preprocessCore::normalize.quantiles(as.matrix(sc_exprs)), "dgCMatrix")
   Expression_cell <- sc_exprs
   rownames(Expression_cell) <- rownames(sc_exprs)
@@ -494,7 +504,7 @@ imputation_ALRA <- function(obj,assay='RNA'){
   if (!requireNamespace("ALRA", quietly = TRUE)) {
     stop("Package 'ALRA' is required for ALRA imputation. Please install it with: install.packages('ALRA')")
   }
-  data <- Seurat::GetAssayData(object = obj, assay = assay, layer = 'data')
+  data <- .getAssayData(object = obj, assay = assay, slot_name = 'data')
   data_alra <- t(ALRA::alra(t(as.matrix(data)))[[3]])
   colnames(data_alra) <- colnames(data)
   data_alra <- Matrix::Matrix(data_alra, sparse = TRUE)
@@ -519,7 +529,7 @@ imputation_ALRA <- function(obj,assay='RNA'){
 imputation_KNN <- function (obj,assay='RNA', LogNormalized = TRUE)
 {
   # Matrix functions available via Imports
-  exp_sc <- Seurat::GetAssayData(object = obj, assay = assay, layer = 'data')
+  exp_sc <- .getAssayData(object = obj, assay = assay, slot_name = 'data')
   nn_network <- obj@graphs[[paste0(assay, "_nn")]]
   
   if (!methods::is(object = exp_sc, class2 = "sparseMatrix")) {
@@ -674,7 +684,7 @@ scPAS.prediction <- function(model, test.data, assay = 'RNA', FDR.threshold = 0.
       test.data <- imputation(test.data, assay = assay, method = imputation_method)
       assay <- Seurat::DefaultAssay(test.data)
     }
-    test.exp <- Seurat::GetAssayData(object = test.data, assay = assay, layer = 'data')
+    test.exp <- .getAssayData(object = test.data, assay = assay, slot_name = 'data')
     Expression_cell <- test.exp
     rownames(Expression_cell) <- rownames(test.exp)
     colnames(Expression_cell) <- colnames(test.exp)
