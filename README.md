@@ -21,14 +21,11 @@
 
 ### Statistical Model
 
-scPAS implements the Augmented and Penalized Minimization with L0 (APML0) algorithm, which optimizes the following objective function:
+scPAS implements the **Augmented and Penalized Minimization with L0 (APML0)** algorithm, which combines:
 
-$$\hat{\boldsymbol{\beta}} = \arg\min_{\boldsymbol{\beta}} \left\{ L(\boldsymbol{\beta}; \mathbf{X}, \mathbf{y}) + \lambda_1 \|\boldsymbol{\beta}\|_1 + \lambda_2 \boldsymbol{\beta}^T \mathbf{L} \boldsymbol{\beta} \right\}$$
-
-where:
-- $L(\boldsymbol{\beta})$ denotes the loss function (Gaussian, binomial, or Cox partial likelihood)
-- $\lambda_1 \|\boldsymbol{\beta}\|_1$ enforces sparsity through L1 regularization
-- $\lambda_2 \boldsymbol{\beta}^T \mathbf{L} \boldsymbol{\beta}$ incorporates network structure via Laplacian regularization
+- **L1 regularization** (LASSO) for sparsity
+- **Laplacian regularization** for incorporating gene network structure
+- **Cross-validation** for optimal parameter selection
 
 ### Supported Regression Families
 
@@ -40,11 +37,11 @@ where:
 
 ### Statistical Inference
 
-Significance is assessed through permutation testing with false discovery rate (FDR) correction using the Benjamini-Hochberg procedure. Cells are classified as:
+Significance is assessed through permutation testing with FDR correction (Benjamini-Hochberg). Cells are classified as:
 
 - **scPAS+**: Positively associated (risk score > 0, FDR < threshold)
-- **scPAS−**: Negatively associated (risk score < 0, FDR < threshold)  
-- **Non-significant**: FDR ≥ threshold
+- **scPAS-**: Negatively associated (risk score < 0, FDR < threshold)  
+- **Non-significant**: FDR >= threshold
 
 ## Installation
 
@@ -60,10 +57,7 @@ install.packages("scPAS", repos = c(
 ### From GitHub
 
 ```r
-# Install devtools if necessary
 if (!require("devtools")) install.packages("devtools")
-
-# Install scPAS
 devtools::install_github("Zaoqu-Liu/scPAS")
 ```
 
@@ -80,7 +74,7 @@ install.packages(c("future", "future.apply"))
 
 ## Documentation
 
-Comprehensive documentation is available at the [pkgdown website](https://zaoqu-liu.github.io/scPAS/).
+Comprehensive documentation: **[https://zaoqu-liu.github.io/scPAS/](https://zaoqu-liu.github.io/scPAS/)**
 
 | Vignette | Description |
 |----------|-------------|
@@ -90,24 +84,21 @@ Comprehensive documentation is available at the [pkgdown website](https://zaoqu-
 | [Survival Analysis](https://zaoqu-liu.github.io/scPAS/articles/case-survival.html) | Cox regression application |
 | [Binary Classification](https://zaoqu-liu.github.io/scPAS/articles/case-binary.html) | Treatment response prediction |
 
-## Usage
-
-### Basic Example
+## Quick Start
 
 ```r
 library(scPAS)
 library(Seurat)
 
-# Execute scPAS analysis
+# Run scPAS analysis
 result <- scPAS(
-  bulk_dataset = bulk_expression,    # Matrix: genes × samples
-  sc_dataset = seurat_object,        # Seurat object
-  phenotype = phenotype_vector,      # Phenotypic data
-
-  family = "gaussian",               # Regression family
-  nfeature = 3000,                   # Variable features
-  permutation_times = 1000,          # Permutation iterations
-  n_cores = 4                        # Parallel cores
+  bulk_dataset = bulk_expression,
+  sc_dataset = seurat_object,
+  phenotype = phenotype_vector,
+  family = "gaussian",
+  nfeature = 3000,
+  permutation_times = 1000,
+  n_cores = 4
 )
 
 # Extract significant cells
@@ -115,27 +106,7 @@ significant_cells <- subset(result, subset = scPAS_FDR < 0.05)
 table(significant_cells$scPAS)
 ```
 
-### Survival Analysis (Cox Regression)
-
-```r
-library(survival)
-
-# Define survival phenotype
-surv_phenotype <- Surv(time = clinical_data$time, 
-                       event = clinical_data$status)
-
-# Run Cox regression analysis
-result <- scPAS(
-  bulk_dataset = bulk_expression,
-  sc_dataset = seurat_object,
-  phenotype = surv_phenotype,
-  family = "cox"
-)
-```
-
 ## Output Structure
-
-scPAS appends the following columns to the Seurat object metadata:
 
 | Column | Description |
 |--------|-------------|
@@ -143,7 +114,7 @@ scPAS appends the following columns to the Seurat object metadata:
 | `scPAS_NRS` | Normalized risk score (Z-statistic) |
 | `scPAS_Pvalue` | Permutation-based p-value |
 | `scPAS_FDR` | Benjamini-Hochberg adjusted p-value |
-| `scPAS` | Cell classification (scPAS+/scPAS−/0) |
+| `scPAS` | Cell classification (scPAS+/scPAS-/0) |
 
 ## Key Features
 
@@ -157,37 +128,13 @@ scPAS appends the following columns to the Seurat object metadata:
 
 If you use scPAS in your research, please cite:
 
-> Xie A, Wang H, Zhao J, Wang Z, Xu J, Xu Y. **scPAS: single-cell phenotype-associated subpopulation identifier.** *Briefings in Bioinformatics*. 2024;26(1):bbae655. doi: [10.1093/bib/bbae655](https://doi.org/10.1093/bib/bbae655)
-
-```bibtex
-@article{xie2024scpas,
-  title={scPAS: single-cell phenotype-associated subpopulation identifier},
-  author={Xie, Aimin and Wang, Hao and Zhao, Jianqiang and Wang, Zhe and Xu, Jing and Xu, Yang},
-  journal={Briefings in Bioinformatics},
-  volume={26},
-  number={1},
-  pages={bbae655},
-  year={2024},
-  publisher={Oxford University Press},
-  doi={10.1093/bib/bbae655}
-}
-```
+> Xie A, Wang H, Zhao J, Wang Z, Xu J, Xu Y. **scPAS: single-cell phenotype-associated subpopulation identifier.** *Briefings in Bioinformatics*. 2024;26(1):bbae655. DOI: [10.1093/bib/bbae655](https://doi.org/10.1093/bib/bbae655)
 
 ## Authors
 
-**Original Author**
-- Aimin Xie (aiminyy1993@gmail.com)
-
-**Maintainer**
-- [Zaoqu Liu](https://orcid.org/0000-0002-0452-742X) (liuzaoqu@163.com)
-  - Department of Interventional Radiology, The First Affiliated Hospital of Zhengzhou University
+- **Aimin Xie** - Original algorithm development
+- **[Zaoqu Liu](https://orcid.org/0000-0002-0452-742X)** - Package maintenance (liuzaoqu@163.com)
 
 ## License
 
-This package is distributed under the [GNU General Public License v3.0](https://www.gnu.org/licenses/gpl-3.0.html).
-
-## Acknowledgments
-
-- Original algorithm development by Aimin Xie et al.
-- Package maintenance and optimization by Zaoqu Liu
-- Computational infrastructure support from Zhengzhou University
+GPL-3.0 | [GNU General Public License v3.0](https://www.gnu.org/licenses/gpl-3.0.html)
