@@ -72,24 +72,127 @@
   <main id="main" class="col-md-9"><div class="section level1">
 <div class="page-header"><h1 id="scpas-single-cell-phenotype-associated-subpopulation-identifier">scPAS: Single-Cell Phenotype-Associated Subpopulation Identifier<a class="anchor" aria-label="anchor" href="#scpas-single-cell-phenotype-associated-subpopulation-identifier"></a>
 </h1></div>
-<p><a href="https://www.r-project.org/" class="external-link"><img src="https://img.shields.io/badge/R-%E2%89%A5%204.0.0-blue.svg" alt="R Version"></a> <a href="https://opensource.org/licenses/GPL-3.0" class="external-link"><img src="https://img.shields.io/badge/license-GPL%20(%3E%3D%203)-green.svg" alt="License"></a> <a href="https://zaoqu-liu.github.io/scPAS/"><img src="https://img.shields.io/badge/docs-pkgdown-blue.svg" alt="pkgdown"></a></p>
+<!-- badges: start -->
+
 <div class="section level2">
-<h2 id="books-documentation">📚 Documentation<a class="anchor" aria-label="anchor" href="#books-documentation"></a>
+<h2 id="overview">Overview<a class="anchor" aria-label="anchor" href="#overview"></a>
 </h2>
-<p><strong><a href="https://zaoqu-liu.github.io/scPAS/">📖 Full Documentation Website</a></strong></p>
+<p><strong>scPAS</strong> is a computational framework for identifying phenotype-associated cell subpopulations from single-cell RNA sequencing (scRNA-seq) data through the integration of bulk transcriptomic profiles and clinical phenotypes. The methodology employs network-regularized sparse regression to quantify the strength of association between individual cells and phenotypic outcomes, enabling both quantitative scoring and statistical inference at single-cell resolution.</p>
+<p align="center">
+<img src="reference/figures/Flow_diagram.png" alt="scPAS Workflow" width="85%"></p>
+</div>
+<div class="section level2">
+<h2 id="methodological-framework">Methodological Framework<a class="anchor" aria-label="anchor" href="#methodological-framework"></a>
+</h2>
+<div class="section level3">
+<h3 id="statistical-model">Statistical Model<a class="anchor" aria-label="anchor" href="#statistical-model"></a>
+</h3>
+<p>scPAS implements the <strong>Augmented and Penalized Minimization with L0 (APML0)</strong> algorithm, which combines:</p>
+<ul>
+<li>
+<strong>L1 regularization</strong> (LASSO) for sparsity</li>
+<li>
+<strong>Laplacian regularization</strong> for incorporating gene network structure</li>
+<li>
+<strong>Cross-validation</strong> for optimal parameter selection</li>
+</ul>
+</div>
+<div class="section level3">
+<h3 id="supported-regression-families">Supported Regression Families<a class="anchor" aria-label="anchor" href="#supported-regression-families"></a>
+</h3>
+<table class="table">
+<colgroup>
+<col width="21%">
+<col width="43%">
+<col width="35%">
+</colgroup>
+<thead><tr>
+<th>Family</th>
+<th>Phenotype Type</th>
+<th>Application</th>
+</tr></thead>
+<tbody>
+<tr>
+<td><strong>Gaussian</strong></td>
+<td>Continuous</td>
+<td>Age, BMI, gene expression levels</td>
+</tr>
+<tr>
+<td><strong>Binomial</strong></td>
+<td>Binary</td>
+<td>Case-control, treatment response</td>
+</tr>
+<tr>
+<td><strong>Cox</strong></td>
+<td>Time-to-event</td>
+<td>Overall survival, progression-free survival</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="section level3">
+<h3 id="statistical-inference">Statistical Inference<a class="anchor" aria-label="anchor" href="#statistical-inference"></a>
+</h3>
+<p>Significance is assessed through permutation testing with FDR correction (Benjamini-Hochberg). Cells are classified as:</p>
+<ul>
+<li>
+<strong>scPAS+</strong>: Positively associated (risk score &gt; 0, FDR &lt; threshold)</li>
+<li>
+<strong>scPAS-</strong>: Negatively associated (risk score &lt; 0, FDR &lt; threshold)<br>
+</li>
+<li>
+<strong>Non-significant</strong>: FDR &gt;= threshold</li>
+</ul>
+</div>
+</div>
+<div class="section level2">
+<h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
+</h2>
+<div class="section level3">
+<h3 id="from-r-universe-recommended">From R-universe (Recommended)<a class="anchor" aria-label="anchor" href="#from-r-universe-recommended"></a>
+</h3>
+<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"scPAS"</span>, repos <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
+<span>  <span class="st">"https://zaoqu-liu.r-universe.dev"</span>,</span>
+<span>  <span class="st">"https://cloud.r-project.org"</span></span>
+<span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+</div>
+<div class="section level3">
+<h3 id="from-github">From GitHub<a class="anchor" aria-label="anchor" href="#from-github"></a>
+</h3>
+<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">require</a></span><span class="op">(</span><span class="st"><a href="https://devtools.r-lib.org/" class="external-link">"devtools"</a></span><span class="op">)</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"devtools"</span><span class="op">)</span></span>
+<span><span class="fu">devtools</span><span class="fu">::</span><span class="fu"><a href="https://remotes.r-lib.org/reference/install_github.html" class="external-link">install_github</a></span><span class="op">(</span><span class="st">"Zaoqu-Liu/scPAS"</span><span class="op">)</span></span></code></pre></div>
+</div>
+<div class="section level3">
+<h3 id="dependencies">Dependencies<a class="anchor" aria-label="anchor" href="#dependencies"></a>
+</h3>
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># Bioconductor dependency</span></span>
+<span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">require</a></span><span class="op">(</span><span class="st"><a href="https://bioconductor.github.io/BiocManager/" class="external-link">"BiocManager"</a></span><span class="op">)</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"BiocManager"</span><span class="op">)</span></span>
+<span><span class="fu">BiocManager</span><span class="fu">::</span><span class="fu"><a href="https://bioconductor.github.io/BiocManager/reference/install.html" class="external-link">install</a></span><span class="op">(</span><span class="st">"preprocessCore"</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Optional: parallel computing</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"future"</span>, <span class="st">"future.apply"</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+</div>
+</div>
+<div class="section level2">
+<h2 id="documentation">Documentation<a class="anchor" aria-label="anchor" href="#documentation"></a>
+</h2>
+<p>Comprehensive documentation: <strong><a href="https://zaoqu-liu.github.io/scPAS/">https://zaoqu-liu.github.io/scPAS/</a></strong></p>
 <table class="table">
 <colgroup>
 <col width="43%">
 <col width="56%">
 </colgroup>
 <thead><tr>
-<th>Tutorial</th>
+<th>Vignette</th>
 <th>Description</th>
 </tr></thead>
 <tbody>
 <tr>
 <td><a href="https://zaoqu-liu.github.io/scPAS/articles/quick-start.html">Quick Start</a></td>
-<td>Get started in 5 minutes</td>
+<td>Basic usage and workflow</td>
 </tr>
 <tr>
 <td><a href="https://zaoqu-liu.github.io/scPAS/articles/algorithm.html">Algorithm</a></td>
@@ -97,480 +200,111 @@
 </tr>
 <tr>
 <td><a href="https://zaoqu-liu.github.io/scPAS/articles/visualization.html">Visualization</a></td>
-<td>Publication-ready figures</td>
+<td>Publication-quality figures</td>
 </tr>
 <tr>
 <td><a href="https://zaoqu-liu.github.io/scPAS/articles/case-survival.html">Survival Analysis</a></td>
-<td>Cox regression case study</td>
+<td>Cox regression application</td>
 </tr>
 <tr>
 <td><a href="https://zaoqu-liu.github.io/scPAS/articles/case-binary.html">Binary Classification</a></td>
-<td>Responder prediction</td>
+<td>Treatment response prediction</td>
 </tr>
 </tbody>
 </table>
 </div>
 <div class="section level2">
-<h2 id="overview">Overview<a class="anchor" aria-label="anchor" href="#overview"></a>
-</h2>
-<p><strong>scPAS</strong> (single-cell Phenotype-Associated Subpopulation identifier) is an R package for identifying cell subpopulations associated with specific phenotypes by integrating single-cell RNA-seq data with bulk RNA-seq data and phenotype information.</p>
-<p>The method uses <strong>network-regularized sparse regression</strong> to quantify the strength of association between each cell and a phenotype (e.g., disease stage, tumor metastasis, treatment response, survival outcomes).</p>
-<div class="section level3">
-<h3 id="key-features">Key Features<a class="anchor" aria-label="anchor" href="#key-features"></a>
-</h3>
-<ul>
-<li>🧬 <strong>Integrative Analysis</strong>: Combines single-cell and bulk RNA-seq data with phenotype information</li>
-<li>📊 <strong>Multiple Regression Families</strong>: Supports Gaussian (continuous), binomial (binary), and Cox (survival) phenotypes</li>
-<li>🔗 <strong>Network-Based Regularization</strong>: Leverages gene-gene similarity networks from single-cell data</li>
-<li>⚡ <strong>Parallel Computing</strong>: Optional parallel permutation testing for faster analysis</li>
-<li>✅ <strong>Seurat v4 Compatible</strong>: Works with Seurat v4 (4.0.0-4.4.0) and SeuratObject v4 (4.0.0-4.1.4)</li>
-<li>🐛 <strong>Bug Fixes</strong>: Version 1.0.3 includes critical fixes for p-value calculation and improved numerical stability</li>
-</ul>
-</div>
-<div class="section level3">
-<h3 id="version-103-updates-maintainer-zaoqu-liu">Version 1.0.3 Updates (Maintainer: Zaoqu Liu)<a class="anchor" aria-label="anchor" href="#version-103-updates-maintainer-zaoqu-liu"></a>
-</h3>
-<p><strong>Scientific Accuracy Improvements:</strong> - ✅ <strong>Fixed p-value calculation</strong>: Changed to proper two-tailed test (multiplied by 2) for statistically correct significance testing - ✅ <strong>Improved numerical stability</strong>: Enhanced <code><a href="reference/sparse.cor.html">sparse.cor()</a></code> function with proper handling of edge cases and zero-variance columns - ✅ <strong>Fixed division-by-zero protection</strong>: Added guards in C++ code for zero standard deviation columns</p>
-<p><strong>Performance &amp; Code Quality:</strong> - ⚡ Optimized <code><a href="reference/scPAS.prediction.html">scPAS.prediction()</a></code>: Added parallel computing support and configurable permutation times - ⚡ Improved <code>sparse_row_scale()</code>: Better handling of sparse matrices with proper documentation - ✅ Enhanced input validation: Comprehensive parameter checking with informative error messages - ✅ Fixed typo: <code><a href="https://rdrr.io/r/base/warnings.html" class="external-link">warnings()</a></code> → <code><a href="https://rdrr.io/r/base/warning.html" class="external-link">warning()</a></code> in imputation function</p>
-</div>
-<div class="section level3">
-<h3 id="previous-version-history">Previous Version History<a class="anchor" aria-label="anchor" href="#previous-version-history"></a>
-</h3>
-<p><strong>Version 1.0.0-1.0.2:</strong> - ✅ Fixed sparse matrix transpose issues in <code><a href="reference/sparse.cor.html">sparse.cor()</a></code> function - ✅ Fixed <code><a href="https://rdrr.io/r/base/colSums.html" class="external-link">rowMeans()</a></code> and <code><a href="https://rdrr.io/r/base/colSums.html" class="external-link">colMeans()</a></code> handling for sparse matrices - ✅ Fixed <code><a href="https://satijalab.org/seurat/reference/FindNeighbors.html" class="external-link">FindNeighbors()</a></code> rownames requirement - ✅ Improved logical indexing to avoid <code><a href="https://rdrr.io/r/base/which.html" class="external-link">which()</a></code> errors with sparse matrices - ✅ Enhanced NA handling in correlation calculations - ⚡ Added parallel computing support for permutation tests - 📚 Improved documentation and examples</p>
-<hr>
-</div>
-</div>
-<div class="section level2">
-<h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
-</h2>
-<div class="section level3">
-<h3 id="system-requirements">System Requirements<a class="anchor" aria-label="anchor" href="#system-requirements"></a>
-</h3>
-<ul>
-<li>R ≥ 4.0.0</li>
-<li>C++11 compiler (for Rcpp components)</li>
-</ul>
-</div>
-<div class="section level3">
-<h3 id="install-from-github">Install from GitHub<a class="anchor" aria-label="anchor" href="#install-from-github"></a>
-</h3>
-<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Install devtools if not already installed</span></span>
-<span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">require</a></span><span class="op">(</span><span class="st"><a href="https://devtools.r-lib.org/" class="external-link">"devtools"</a></span><span class="op">)</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"devtools"</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Install scPAS</span></span>
-<span><span class="fu">devtools</span><span class="fu">::</span><span class="fu"><a href="https://remotes.r-lib.org/reference/install_github.html" class="external-link">install_github</a></span><span class="op">(</span><span class="st">"Zaoqu-Liu/scPAS"</span><span class="op">)</span></span></code></pre></div>
-</div>
-<div class="section level3">
-<h3 id="install-dependencies">Install Dependencies<a class="anchor" aria-label="anchor" href="#install-dependencies"></a>
-</h3>
-<p>Most dependencies will be installed automatically. If needed, install manually:</p>
-<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Core dependencies</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Rcpp"</span>, <span class="st">"Matrix"</span>, <span class="st">"methods"</span><span class="op">)</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Bioconductor dependencies</span></span>
-<span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">require</a></span><span class="op">(</span><span class="st"><a href="https://bioconductor.github.io/BiocManager/" class="external-link">"BiocManager"</a></span><span class="op">)</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"BiocManager"</span><span class="op">)</span></span>
-<span><span class="fu">BiocManager</span><span class="fu">::</span><span class="fu"><a href="https://bioconductor.github.io/BiocManager/reference/install.html" class="external-link">install</a></span><span class="op">(</span><span class="st">"preprocessCore"</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Seurat (required)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"Seurat"</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Optional: for parallel computing</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"future"</span>, <span class="st">"future.apply"</span><span class="op">)</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Optional: for ALRA imputation</span></span>
-<span><span class="fu">devtools</span><span class="fu">::</span><span class="fu"><a href="https://remotes.r-lib.org/reference/install_github.html" class="external-link">install_github</a></span><span class="op">(</span><span class="st">"KlugerLab/ALRA"</span><span class="op">)</span></span></code></pre></div>
-<hr>
-</div>
-</div>
-<div class="section level2">
 <h2 id="quick-start">Quick Start<a class="anchor" aria-label="anchor" href="#quick-start"></a>
 </h2>
-<div class="section level3">
-<h3 id="basic-usage">Basic Usage<a class="anchor" aria-label="anchor" href="#basic-usage"></a>
-</h3>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/Zaoqu-Liu/scPAS" class="external-link">scPAS</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://satijalab.org/seurat" class="external-link">Seurat</a></span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Run scPAS analysis</span></span>
 <span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/scPAS.html">scPAS</a></span><span class="op">(</span></span>
-<span>  bulk_dataset <span class="op">=</span> <span class="va">bulk_exp</span>,        <span class="co"># Bulk RNA-seq expression matrix (genes x samples)</span></span>
-<span>  sc_dataset <span class="op">=</span> <span class="va">seurat_obj</span>,        <span class="co"># Seurat object with single-cell data</span></span>
-<span>  phenotype <span class="op">=</span> <span class="va">phenotype_vector</span>,   <span class="co"># Phenotype values for bulk samples</span></span>
-<span>  family <span class="op">=</span> <span class="st">"gaussian"</span>,            <span class="co"># "gaussian", "binomial", or "cox"</span></span>
-<span>  permutation_times <span class="op">=</span> <span class="fl">1000</span>,       <span class="co"># Number of permutations for significance testing</span></span>
-<span>  imputation <span class="op">=</span> <span class="cn">FALSE</span>,             <span class="co"># Whether to perform imputation</span></span>
-<span>  n_cores <span class="op">=</span> <span class="fl">4</span>                     <span class="co"># Parallel computing (optional)</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Check results</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">result</span><span class="op">@</span><span class="va">meta.data</span><span class="op">[</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"scPAS_RS"</span>, <span class="st">"scPAS_FDR"</span>, <span class="st">"scPAS"</span><span class="op">)</span><span class="op">]</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Identify significant cells</span></span>
-<span><span class="va">sig_cells</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/subset.html" class="external-link">subset</a></span><span class="op">(</span><span class="va">result</span>, subset <span class="op">=</span> <span class="va">scPAS_FDR</span> <span class="op">&lt;</span> <span class="fl">0.05</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/table.html" class="external-link">table</a></span><span class="op">(</span><span class="va">sig_cells</span><span class="op">$</span><span class="va">scPAS</span><span class="op">)</span>  <span class="co"># scPAS+, scPAS-, or 0</span></span></code></pre></div>
-</div>
-<div class="section level3">
-<h3 id="detailed-example">Detailed Example<a class="anchor" aria-label="anchor" href="#detailed-example"></a>
-</h3>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Load example data</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/utils/data.html" class="external-link">data</a></span><span class="op">(</span><span class="st">"bulk_deconv_example"</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/utils/data.html" class="external-link">data</a></span><span class="op">(</span><span class="st">"pancreas_sub"</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Create a phenotype (e.g., continuous trait)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">123</span><span class="op">)</span></span>
-<span><span class="va">phenotype</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">ncol</a></span><span class="op">(</span><span class="va">bulk_deconv_example</span><span class="op">$</span><span class="va">bulk.data</span><span class="op">)</span>, mean <span class="op">=</span> <span class="fl">50</span>, sd <span class="op">=</span> <span class="fl">10</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Run scPAS analysis</span></span>
-<span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/scPAS.html">scPAS</a></span><span class="op">(</span></span>
-<span>  bulk_dataset <span class="op">=</span> <span class="va">bulk_deconv_example</span><span class="op">$</span><span class="va">bulk.data</span>,</span>
-<span>  sc_dataset <span class="op">=</span> <span class="va">pancreas_sub</span>,</span>
-<span>  phenotype <span class="op">=</span> <span class="va">phenotype</span>,</span>
+<span>  bulk_dataset <span class="op">=</span> <span class="va">bulk_expression</span>,</span>
+<span>  sc_dataset <span class="op">=</span> <span class="va">seurat_object</span>,</span>
+<span>  phenotype <span class="op">=</span> <span class="va">phenotype_vector</span>,</span>
 <span>  family <span class="op">=</span> <span class="st">"gaussian"</span>,</span>
-<span>  nfeature <span class="op">=</span> <span class="fl">3000</span>,              <span class="co"># Number of variable features</span></span>
-<span>  permutation_times <span class="op">=</span> <span class="fl">1000</span>,     <span class="co"># Permutations for significance</span></span>
-<span>  imputation <span class="op">=</span> <span class="cn">FALSE</span>,           <span class="co"># Skip imputation (faster)</span></span>
-<span>  n_cores <span class="op">=</span> <span class="fl">1</span>                   <span class="co"># Sequential processing</span></span>
+<span>  nfeature <span class="op">=</span> <span class="fl">3000</span>,</span>
+<span>  permutation_times <span class="op">=</span> <span class="fl">1000</span>,</span>
+<span>  n_cores <span class="op">=</span> <span class="fl">4</span></span>
 <span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Examine results</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Total cells:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">ncol</a></span><span class="op">(</span><span class="va">result</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Significant cells:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">result</span><span class="op">$</span><span class="va">scPAS_FDR</span> <span class="op">&lt;</span> <span class="fl">0.05</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"scPAS+ cells:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">result</span><span class="op">$</span><span class="va">scPAS</span> <span class="op">==</span> <span class="st">"scPAS+"</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"scPAS- cells:"</span>, <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">result</span><span class="op">$</span><span class="va">scPAS</span> <span class="op">==</span> <span class="st">"scPAS-"</span><span class="op">)</span>, <span class="st">"\n"</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Cell type enrichment</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/table.html" class="external-link">table</a></span><span class="op">(</span><span class="va">result</span><span class="op">$</span><span class="va">CellType</span><span class="op">[</span><span class="va">result</span><span class="op">$</span><span class="va">scPAS_FDR</span> <span class="op">&lt;</span> <span class="fl">0.05</span><span class="op">]</span><span class="op">)</span></span></code></pre></div>
-<hr>
-</div>
+<span><span class="co"># Extract significant cells</span></span>
+<span><span class="va">significant_cells</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/subset.html" class="external-link">subset</a></span><span class="op">(</span><span class="va">result</span>, subset <span class="op">=</span> <span class="va">scPAS_FDR</span> <span class="op">&lt;</span> <span class="fl">0.05</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/table.html" class="external-link">table</a></span><span class="op">(</span><span class="va">significant_cells</span><span class="op">$</span><span class="va">scPAS</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="output-structure">Output Structure<a class="anchor" aria-label="anchor" href="#output-structure"></a>
 </h2>
-<div class="section level3">
-<h3 id="metadata-columns-added-to-seurat-object">Metadata Columns Added to Seurat Object<a class="anchor" aria-label="anchor" href="#metadata-columns-added-to-seurat-object"></a>
-</h3>
 <table class="table">
-<colgroup>
-<col width="22%">
-<col width="36%">
-<col width="41%">
-</colgroup>
 <thead><tr>
 <th>Column</th>
 <th>Description</th>
-<th>Example Range</th>
 </tr></thead>
 <tbody>
 <tr>
 <td><code>scPAS_RS</code></td>
 <td>Raw risk score</td>
-<td>[-0.054, 0.033]</td>
 </tr>
 <tr>
 <td><code>scPAS_NRS</code></td>
 <td>Normalized risk score (Z-statistic)</td>
-<td>[-10.24, 6.67]</td>
 </tr>
 <tr>
 <td><code>scPAS_Pvalue</code></td>
-<td>P-value from permutation test</td>
-<td>[0.000, 0.500]</td>
+<td>Permutation-based p-value</td>
 </tr>
 <tr>
 <td><code>scPAS_FDR</code></td>
-<td>FDR-adjusted p-value (BH method)</td>
-<td>[0.000, 0.500]</td>
+<td>Benjamini-Hochberg adjusted p-value</td>
 </tr>
 <tr>
 <td><code>scPAS</code></td>
-<td>Cell classification: “scPAS+”, “scPAS-”, or “0”</td>
-<td>Categorical</td>
+<td>Cell classification (scPAS+/scPAS-/0)</td>
 </tr>
 </tbody>
 </table>
 </div>
-<div class="section level3">
-<h3 id="interpretation">Interpretation<a class="anchor" aria-label="anchor" href="#interpretation"></a>
-</h3>
+<div class="section level2">
+<h2 id="key-features">Key Features<a class="anchor" aria-label="anchor" href="#key-features"></a>
+</h2>
 <ul>
 <li>
-<strong>scPAS+</strong>: Cells positively associated with the phenotype (high score, low FDR)</li>
+<strong>Multi-modal Integration</strong>: Bridges bulk and single-cell transcriptomics</li>
 <li>
-<strong>scPAS-</strong>: Cells negatively associated with the phenotype (low score, low FDR)</li>
+<strong>Network Regularization</strong>: Incorporates gene-gene co-expression structure</li>
 <li>
-<strong>0</strong>: Cells not significantly associated with the phenotype</li>
+<strong>Flexible Phenotypes</strong>: Supports continuous, binary, and survival outcomes</li>
+<li>
+<strong>Scalable Computation</strong>: Parallel processing for large-scale datasets</li>
+<li>
+<strong>Seurat Integration</strong>: Native support for Seurat v4 objects</li>
 </ul>
-<hr>
-</div>
-</div>
-<div class="section level2">
-<h2 id="parameters">Parameters<a class="anchor" aria-label="anchor" href="#parameters"></a>
-</h2>
-<div class="section level3">
-<h3 id="main-function-scpas">Main Function: <code>scPAS()</code>
-<a class="anchor" aria-label="anchor" href="#main-function-scpas"></a>
-</h3>
-<table class="table">
-<colgroup>
-<col width="28%">
-<col width="15%">
-<col width="23%">
-<col width="33%">
-</colgroup>
-<thead><tr>
-<th>Parameter</th>
-<th>Type</th>
-<th>Default</th>
-<th>Description</th>
-</tr></thead>
-<tbody>
-<tr>
-<td><code>bulk_dataset</code></td>
-<td>Matrix</td>
-<td>Required</td>
-<td>Bulk expression matrix (genes x samples)</td>
-</tr>
-<tr>
-<td><code>sc_dataset</code></td>
-<td>Seurat</td>
-<td>Required</td>
-<td>Seurat object with single-cell data</td>
-</tr>
-<tr>
-<td><code>phenotype</code></td>
-<td>Vector/Matrix</td>
-<td>Required</td>
-<td>Phenotype values (continuous, binary, or survival)</td>
-</tr>
-<tr>
-<td><code>family</code></td>
-<td>Character</td>
-<td><code>"gaussian"</code></td>
-<td>Regression family: “gaussian”, “binomial”, or “cox”</td>
-</tr>
-<tr>
-<td><code>nfeature</code></td>
-<td>Integer</td>
-<td><code>NULL</code></td>
-<td>Number of variable features (NULL = all common genes)</td>
-</tr>
-<tr>
-<td><code>imputation</code></td>
-<td>Logical</td>
-<td><code>TRUE</code></td>
-<td>Whether to perform imputation</td>
-</tr>
-<tr>
-<td><code>imputation_method</code></td>
-<td>Character</td>
-<td><code>"KNN"</code></td>
-<td>Imputation method: “KNN” or “ALRA”</td>
-</tr>
-<tr>
-<td><code>permutation_times</code></td>
-<td>Integer</td>
-<td><code>2000</code></td>
-<td>Number of permutations (1000-5000 recommended)</td>
-</tr>
-<tr>
-<td><code>n_cores</code></td>
-<td>Integer</td>
-<td><code>1</code></td>
-<td>Number of CPU cores for parallel processing</td>
-</tr>
-<tr>
-<td><code>FDR.threshold</code></td>
-<td>Numeric</td>
-<td><code>0.05</code></td>
-<td>FDR threshold for significance</td>
-</tr>
-<tr>
-<td><code>alpha</code></td>
-<td>Numeric</td>
-<td><code>NULL</code></td>
-<td>Elastic net mixing parameter (0-1)</td>
-</tr>
-</tbody>
-</table>
-<hr>
-</div>
-</div>
-<div class="section level2">
-<h2 id="phenotype-types">Phenotype Types<a class="anchor" aria-label="anchor" href="#phenotype-types"></a>
-</h2>
-<div class="section level3">
-<h3 id="id_1-continuous-phenotype-gaussian">1. Continuous Phenotype (Gaussian)<a class="anchor" aria-label="anchor" href="#id_1-continuous-phenotype-gaussian"></a>
-</h3>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Age, BMI, gene expression, etc.</span></span>
-<span><span class="va">phenotype</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">45.2</span>, <span class="fl">52.1</span>, <span class="fl">38.7</span>, <span class="fl">60.3</span>, <span class="va">...</span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/scPAS.html">scPAS</a></span><span class="op">(</span></span>
-<span>  bulk_dataset <span class="op">=</span> <span class="va">bulk_exp</span>,</span>
-<span>  sc_dataset <span class="op">=</span> <span class="va">seurat_obj</span>,</span>
-<span>  phenotype <span class="op">=</span> <span class="va">phenotype</span>,</span>
-<span>  family <span class="op">=</span> <span class="st">"gaussian"</span></span>
-<span><span class="op">)</span></span></code></pre></div>
-</div>
-<div class="section level3">
-<h3 id="id_2-binary-phenotype-binomial">2. Binary Phenotype (Binomial)<a class="anchor" aria-label="anchor" href="#id_2-binary-phenotype-binomial"></a>
-</h3>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Case-control, responder-nonresponder, etc.</span></span>
-<span><span class="va">phenotype</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">1</span>, <span class="fl">0</span>, <span class="fl">1</span>, <span class="fl">1</span>, <span class="fl">0</span>, <span class="va">...</span><span class="op">)</span>  <span class="co"># 0 = control, 1 = case</span></span>
-<span></span>
-<span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/scPAS.html">scPAS</a></span><span class="op">(</span></span>
-<span>  bulk_dataset <span class="op">=</span> <span class="va">bulk_exp</span>,</span>
-<span>  sc_dataset <span class="op">=</span> <span class="va">seurat_obj</span>,</span>
-<span>  phenotype <span class="op">=</span> <span class="va">phenotype</span>,</span>
-<span>  family <span class="op">=</span> <span class="st">"binomial"</span>,</span>
-<span>  tag <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Control"</span>, <span class="st">"Case"</span><span class="op">)</span></span>
-<span><span class="op">)</span></span></code></pre></div>
-</div>
-<div class="section level3">
-<h3 id="id_3-survival-phenotype-cox">3. Survival Phenotype (Cox)<a class="anchor" aria-label="anchor" href="#id_3-survival-phenotype-cox"></a>
-</h3>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Time-to-event data</span></span>
-<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/therneau/survival" class="external-link">survival</a></span><span class="op">)</span></span>
-<span><span class="va">phenotype</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/survival/man/Surv.html" class="external-link">Surv</a></span><span class="op">(</span>time <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">120</span>, <span class="fl">45</span>, <span class="fl">200</span>, <span class="fl">89</span><span class="op">)</span>, </span>
-<span>                  event <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">1</span>, <span class="fl">0</span>, <span class="fl">1</span><span class="op">)</span><span class="op">)</span>  <span class="co"># 1 = event, 0 = censored</span></span>
-<span></span>
-<span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/scPAS.html">scPAS</a></span><span class="op">(</span></span>
-<span>  bulk_dataset <span class="op">=</span> <span class="va">bulk_exp</span>,</span>
-<span>  sc_dataset <span class="op">=</span> <span class="va">seurat_obj</span>,</span>
-<span>  phenotype <span class="op">=</span> <span class="va">phenotype</span>,</span>
-<span>  family <span class="op">=</span> <span class="st">"cox"</span></span>
-<span><span class="op">)</span></span></code></pre></div>
-<hr>
-</div>
-</div>
-<div class="section level2">
-<h2 id="performance-tips">Performance Tips<a class="anchor" aria-label="anchor" href="#performance-tips"></a>
-</h2>
-<div class="section level3">
-<h3 id="speed-optimization">Speed Optimization<a class="anchor" aria-label="anchor" href="#speed-optimization"></a>
-</h3>
-<ol style="list-style-type: decimal">
-<li>
-<p><strong>Use parallel computing</strong> (requires <code>future</code> and <code>future.apply</code>):</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/scPAS.html">scPAS</a></span><span class="op">(</span><span class="va">...</span>, n_cores <span class="op">=</span> <span class="fl">4</span><span class="op">)</span>  <span class="co"># 2-4x faster</span></span></code></pre></div>
-</li>
-<li>
-<p><strong>Reduce permutations for testing</strong>:</p>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/scPAS.html">scPAS</a></span><span class="op">(</span><span class="va">...</span>, permutation_times <span class="op">=</span> <span class="fl">500</span><span class="op">)</span>  <span class="co"># Faster, less accurate</span></span></code></pre></div>
-</li>
-<li>
-<p><strong>Skip imputation if data quality is good</strong>:</p>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/scPAS.html">scPAS</a></span><span class="op">(</span><span class="va">...</span>, imputation <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span>  <span class="co"># Much faster</span></span></code></pre></div>
-</li>
-<li>
-<p><strong>Use fewer features</strong>:</p>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/scPAS.html">scPAS</a></span><span class="op">(</span><span class="va">...</span>, nfeature <span class="op">=</span> <span class="fl">2000</span><span class="op">)</span>  <span class="co"># Faster than 3000-5000</span></span></code></pre></div>
-</li>
-</ol>
-</div>
-<div class="section level3">
-<h3 id="memory-management">Memory Management<a class="anchor" aria-label="anchor" href="#memory-management"></a>
-</h3>
-<p>For large datasets (&gt;10,000 cells): - Use sparse matrices - Process in batches if needed - Monitor memory with <code><a href="https://rdrr.io/r/utils/object.size.html" class="external-link">object.size()</a></code></p>
-<hr>
-</div>
 </div>
 <div class="section level2">
 <h2 id="citation">Citation<a class="anchor" aria-label="anchor" href="#citation"></a>
 </h2>
 <p>If you use scPAS in your research, please cite:</p>
 <blockquote>
-<p>Xie A, Wang H, Zhao J, Wang Z, Xu J, Xu Y. (2024) <em>scPAS: single-cell phenotype-associated subpopulation identifier</em>. Brief Bioinform 26(1):bbae655. <a href="https://doi.org/10.1093/bib/bbae655" class="external-link uri">https://doi.org/10.1093/bib/bbae655</a></p>
+<p>Xie A, Wang H, Zhao J, Wang Z, Xu J, Xu Y. <strong>scPAS: single-cell phenotype-associated subpopulation identifier.</strong> <em>Briefings in Bioinformatics</em>. 2024;26(1):bbae655. DOI: <a href="https://doi.org/10.1093/bib/bbae655" class="external-link">10.1093/bib/bbae655</a></p>
 </blockquote>
-<hr>
 </div>
 <div class="section level2">
-<h2 id="authors-and-maintainer">Authors and Maintainer<a class="anchor" aria-label="anchor" href="#authors-and-maintainer"></a>
+<h2 id="authors">Authors<a class="anchor" aria-label="anchor" href="#authors"></a>
 </h2>
-<div class="section level3">
-<h3 id="original-author">Original Author<a class="anchor" aria-label="anchor" href="#original-author"></a>
-</h3>
 <ul>
 <li>
-<strong>Aimin Xie</strong> (<a href="mailto:aiminyy1993@gmail.com" class="email">aiminyy1993@gmail.com</a>) - Original algorithm and implementation</li>
-</ul>
-</div>
-<div class="section level3">
-<h3 id="current-maintainer">Current Maintainer<a class="anchor" aria-label="anchor" href="#current-maintainer"></a>
-</h3>
-<ul>
+<strong>Aimin Xie</strong> - Original algorithm development</li>
 <li>
-<strong>Zaoqu Liu</strong> (<a href="mailto:liuzaoqu@163.com" class="email">liuzaoqu@163.com</a>) - Maintenance, bug fixes, and optimization
-<ul>
-<li>ORCID: <a href="https://orcid.org/0000-0002-0452-742X" class="external-link">0000-0002-0452-742X</a>
-</li>
+<strong><a href="https://orcid.org/0000-0002-0452-742X" class="external-link">Zaoqu Liu</a></strong> - Package maintenance (<a href="mailto:liuzaoqu@163.com" class="email">liuzaoqu@163.com</a>)</li>
 </ul>
-</li>
-</ul>
-<hr>
-</div>
-</div>
-<div class="section level2">
-<h2 id="contributing">Contributing<a class="anchor" aria-label="anchor" href="#contributing"></a>
-</h2>
-<p>Contributions are welcome! Please:</p>
-<ol style="list-style-type: decimal">
-<li>Fork the repository</li>
-<li>Create a feature branch</li>
-<li>Make your changes with clear commit messages</li>
-<li>Submit a pull request</li>
-</ol>
-<p>For bug reports and feature requests, please use the <a href="https://github.com/Zaoqu-Liu/scPAS/issues" class="external-link">GitHub Issues</a> page.</p>
-<hr>
 </div>
 <div class="section level2">
 <h2 id="license">License<a class="anchor" aria-label="anchor" href="#license"></a>
 </h2>
-<p>This package is licensed under the <strong>GNU General Public License v2 or later</strong> (GPL ≥ 2).</p>
-<p>See the <a href="LICENSE">LICENSE</a> file for details.</p>
-<hr>
-</div>
-<div class="section level2">
-<h2 id="workflow-diagram">Workflow Diagram<a class="anchor" aria-label="anchor" href="#workflow-diagram"></a>
-</h2>
-<div class="float">
-<img src="reference/figures/Flow_diagram.png" alt="scPAS Workflow"><div class="figcaption">scPAS Workflow</div>
-</div>
-<p>The scPAS workflow integrates: 1. <strong>Bulk RNA-seq</strong> data with phenotype information 2. <strong>Single-cell RNA-seq</strong> data with gene-gene networks 3. <strong>Network-regularized sparse regression</strong> model 4. <strong>Permutation-based significance</strong> testing</p>
-<hr>
-</div>
-<div class="section level2">
-<h2 id="support">Support<a class="anchor" aria-label="anchor" href="#support"></a>
-</h2>
-<p>For questions and support:</p>
-<ul>
-<li>📧 Email: <a href="mailto:liuzaoqu@163.com" class="email">liuzaoqu@163.com</a>
-</li>
-<li>🐛 Issues: <a href="https://github.com/Zaoqu-Liu/scPAS/issues" class="external-link uri">https://github.com/Zaoqu-Liu/scPAS/issues</a>
-</li>
-<li>📖 Tutorial: See <code>vignettes/scPAS_Tutorial.Rmd</code>
-</li>
-</ul>
-<hr>
-</div>
-<div class="section level2">
-<h2 id="acknowledgments">Acknowledgments<a class="anchor" aria-label="anchor" href="#acknowledgments"></a>
-</h2>
-<ul>
-<li>Original scPAS method by Aimin Xie et al.</li>
-<li>Bug fixes and maintenance by Zaoqu Liu</li>
-<li>Integration with CellScope package ecosystem</li>
-</ul>
+<p>GPL-3.0 | <a href="https://www.gnu.org/licenses/gpl-3.0.html" class="external-link">GNU General Public License v3.0</a></p>
 </div>
 </div>
   </main><aside class="col-md-3"><div class="links">
@@ -608,7 +342,17 @@
 </ul>
 </div>
 
-
+<div class="dev-status">
+<h2 data-toc-skip>Dev status</h2>
+<ul class="list-unstyled">
+<li><a href="https://zaoqu-liu.r-universe.dev/scPAS" class="external-link"><img src="https://zaoqu-liu.r-universe.dev/badges/scPAS" alt="R-universe"></a></li>
+<li><a href="https://github.com/Zaoqu-Liu/scPAS" class="external-link"><img src="https://img.shields.io/badge/R--CMD--check-passing-brightgreen.svg" alt="R-CMD-check"></a></li>
+<li><a href="https://www.r-project.org/" class="external-link"><img src="https://img.shields.io/badge/R-%E2%89%A5%204.0.0-blue.svg" alt="R Version"></a></li>
+<li><a href="https://www.gnu.org/licenses/gpl-3.0" class="external-link"><img src="https://img.shields.io/badge/License-GPLv3-blue.svg" alt="License: GPL v3"></a></li>
+<li><a href="https://doi.org/10.1093/bib/bbae655" class="external-link"><img src="https://img.shields.io/badge/DOI-10.1093%2Fbib%2Fbbae655-blue.svg" alt="DOI"></a></li>
+<li><a href="https://zaoqu-liu.github.io/scPAS/"><img src="https://img.shields.io/badge/docs-pkgdown-blue.svg" alt="pkgdown"></a></li>
+</ul>
+</div>
 
   </aside>
 </div>
